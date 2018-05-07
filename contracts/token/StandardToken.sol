@@ -1,6 +1,7 @@
 pragma solidity ^0.4.23;
 
 import './ERC223.sol';
+import './ERC223ReceivingContract.sol';
 import '../lib/SafeMath.sol';
 
 contract StandardToken is ERC223 {
@@ -32,8 +33,6 @@ contract StandardToken is ERC223 {
     * @param _data Transaction metadata.
     */
     function transfer(address _to, uint256 _value, bytes _data) public validAddress(_to) returns (bool success) {
-        require(_address != address(0));
-
         uint codeLength;
 
         assembly {
