@@ -9,6 +9,12 @@ contract StandardToken is ERC223 {
     mapping(address => uint256) balances;
     mapping (address => mapping (address => uint256)) allowed;
 
+    // Modifiers
+    modifier validAddress(address _address) {
+        require(_address != address(0));
+        _;
+    }
+
     /*
     * @dev ERC20 method to transfer token to a specified address.
     * @param _to The address to transfer to.
@@ -26,6 +32,8 @@ contract StandardToken is ERC223 {
     * @param _data Transaction metadata.
     */
     function transfer(address _to, uint256 _value, bytes _data) public validAddress(_to) returns (bool success) {
+        require(_address != address(0));
+
         uint codeLength;
 
         assembly {
@@ -69,9 +77,7 @@ contract StandardToken is ERC223 {
     * @param _to address The address which you want to transfer to
     * @param _value uint256 the amount of tokens to be transferred
     */
-    function transferFrom(address _from, address _to, uint256 _value) public returns (bool) {
-        require(_to != address(0));
-
+    function transferFrom(address _from, address _to, uint256 _value) public validAddress(_to) returns (bool) {
         uint256 _allowance = allowed[_from][msg.sender];
 
         // Check is not needed because sub(_allowance, _value) will already throw if this condition is not met
