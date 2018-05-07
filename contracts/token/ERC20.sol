@@ -4,7 +4,7 @@ pragma solidity ^0.4.23;
  * @title ERC20 interface
  * @dev Implements ERC20 Token Standard: https://github.com/ethereum/EIPs/issues/20
  */
-contract ERC20Interface {
+contract ERC20 {
     uint256 public totalSupply;
 
     function transfer(address _to, uint256 _value) public returns (bool success);
