@@ -10,22 +10,39 @@ contract StandardToken is ERC223 {
     mapping (address => mapping (address => uint256)) allowed;
 
     /*
-    * @dev transfer token for a specified address
+    * @dev ERC20 method to transfer token to a specified address.
     * @param _to The address to transfer to.
     * @param _value The amount to be transferred.
     */
     function transfer(address _to, uint256 _value) public returns (bool) {
-        require(_to != address(0));
-
-        // SafeMath.sub will throw if there is not enough balance.
-        balances[msg.sender] = balances[msg.sender].sub(_value);
-        balances[_to] = balances[_to].add(_value);
-        emit Transfer(msg.sender, _to, _value);
-        return true;
+        bytes memory empty;
+        transfer(_to, _value, empty);
     }
 
-    function transfer(address _to, uint256 _value, bytes _data) public returns (bool success) {
-        // TODO: implement
+    /*
+    * @dev ERC223 method to transfer token to a specified address with data.
+    * @param _to The address to transfer to.
+    * @param _value The amount to be transferred.
+    * @param _data Transaction metadata.
+    */
+    function transfer(address _to, uint256 _value, bytes _data) public validAddress(_to) returns (bool success) {
+        uint codeLength;
+
+        assembly {
+            // Retrieve the size of the code on target address, this needs assembly
+            codeLength := extcodesize(_to)
+        }
+
+        balances[msg.sender] = balances[msg.sender].sub(_value);
+        balances[_to] = balances[_to].add(_value);
+
+        // Call token fallback function if _to is a contract
+        if (codeLength > 0) {
+            ERC223ReceivingContract receiver = ERC223ReceivingContract(_to);
+            receiver.tokenFallback(msg.sender, _value, _data);
+        }
+
+        emit Transfer(msg.sender, _to, _value, _data);
         return true;
     }
 
