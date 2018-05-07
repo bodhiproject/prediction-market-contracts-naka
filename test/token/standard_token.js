@@ -32,6 +32,81 @@ contract('StandardToken', (accounts) => {
     });
   });
 
+  describe('transfer', async () => {
+    it('should allow transfers if the account has tokens', async () => {
+      let ownerBalance = tokenParams._initialBalance;
+      assert.equal(await instance.balanceOf(OWNER, { from: OWNER }), ownerBalance);
+
+      // transfer from OWNER to accounts[1]
+      const acct1TransferAmt = 300000;
+      await instance.transfer(ACCT1, acct1TransferAmt, { from: OWNER });
+      assert.equal(await instance.balanceOf(ACCT1), acct1TransferAmt);
+
+      ownerBalance -= acct1TransferAmt;
+      assert.equal(await instance.balanceOf(OWNER), ownerBalance);
+
+      // transfer from OWNER to accounts[2]
+      const acct2TransferAmt = 250000;
+      await instance.transfer(ACCT2, acct2TransferAmt, { from: OWNER });
+      assert.equal(await instance.balanceOf(ACCT2), acct2TransferAmt);
+
+      ownerBalance -= acct2TransferAmt;
+      assert.equal(await instance.balanceOf(OWNER, { from: OWNER }), ownerBalance);
+
+      // transfer from accounts[2] to accounts[3]
+      await instance.transfer(ACCT3, acct2TransferAmt, { from: ACCT2 });
+      assert.equal(await instance.balanceOf(ACCT3), acct2TransferAmt);
+      assert.equal(await instance.balanceOf(ACCT2), 0);
+    });
+
+    it('should throw if the to address is not valid', async () => {
+      try {
+        await instance.transfer(0, 1000, { from: OWNER });
+      } catch (e) {
+        SolAssert.assertRevert(e);
+      }
+    });
+
+    it('should throw if the balance of the transferer is less than the amount', async () => {
+      assert.equal(await instance.balanceOf(OWNER), tokenParams._initialBalance);
+      try {
+        await instance.transfer(ACCT1, tokenParams._initialBalance + 1, { from: OWNER });
+      } catch (e) {
+        SolAssert.assertInvalidOpcode(e);
+      }
+
+      try {
+        await instance.transfer(ACCT3, 1, { from: ACCT2 });
+      } catch (e) {
+        SolAssert.assertInvalidOpcode(e);
+      }
+    });
+  });
+
+  describe('approve', async () => {
+    it('should allow approving', async () => {
+      const acct1Allowance = 1000;
+      await instance.approve(ACCT1, acct1Allowance, { from: OWNER });
+      assert.equal(await instance.allowance(OWNER, ACCT1), acct1Allowance);
+
+      const acct2Allowance = 3000;
+      await instance.approve(ACCT2, acct2Allowance, { from: OWNER });
+      assert.equal(await instance.allowance(OWNER, ACCT2), acct2Allowance);
+    });
+
+    it('should throw if the value is not 0 and has previous approval', async () => {
+      const acct1Allowance = 1000;
+      await instance.approve(ACCT1, acct1Allowance, { from: OWNER });
+      assert.equal(await instance.allowance(OWNER, ACCT1), acct1Allowance);
+
+      try {
+        await instance.approve(ACCT1, 123, { from: OWNER });
+      } catch (e) {
+        SolAssert.assertRevert(e);
+      }
+    });
+  });
+
   describe('transferFrom', async () => {
     it('should allow transferring the allowed amount', async () => {
       let ownerBalance = tokenParams._initialBalance;
@@ -101,27 +176,11 @@ contract('StandardToken', (accounts) => {
     });
   });
 
-  describe('approve', async () => {
-    it('should allow approving', async () => {
-      const acct1Allowance = 1000;
-      await instance.approve(ACCT1, acct1Allowance, { from: OWNER });
-      assert.equal(await instance.allowance(OWNER, ACCT1), acct1Allowance);
-
-      const acct2Allowance = 3000;
-      await instance.approve(ACCT2, acct2Allowance, { from: OWNER });
-      assert.equal(await instance.allowance(OWNER, ACCT2), acct2Allowance);
-    });
-
-    it('should throw if the value is not 0 and has previous approval', async () => {
-      const acct1Allowance = 1000;
-      await instance.approve(ACCT1, acct1Allowance, { from: OWNER });
-      assert.equal(await instance.allowance(OWNER, ACCT1), acct1Allowance);
-
-      try {
-        await instance.approve(ACCT1, 123, { from: OWNER });
-      } catch (e) {
-        SolAssert.assertRevert(e);
-      }
+  describe('balanceOf', async () => {
+    it('should return the right balance', async () => {
+      assert.equal(await instance.balanceOf(OWNER), tokenParams._initialBalance);
+      assert.equal(await instance.balanceOf(ACCT1), 0);
+      assert.equal(await instance.balanceOf(ACCT2), 0);
     });
   });
 
