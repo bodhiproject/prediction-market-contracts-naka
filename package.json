@@ -1,0 +1,34 @@
+{
+  "name": "bodhi-ethereum",
+  "version": "1.0.0",
+  "description": "Bodhi Ethereum Contracts",
+  "main": "truffle-config.js",
+  "directories": {
+    "test": "test"
+  },
+  "dependencies": {
+    "solc": "^0.4.23"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "truffle test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bodhiproject/bodhi-ethereum.git"
+  },
+  "keywords": [
+    "bodhi",
+    "ethereum",
+    "erc223",
+    "prediction",
+    "market",
+    "dapp"
+  ],
+  "author": "Deric Walintukan",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/bodhiproject/bodhi-ethereum/issues"
+  },
+  "homepage": "https://github.com/bodhiproject/bodhi-ethereum#readme"
+}
