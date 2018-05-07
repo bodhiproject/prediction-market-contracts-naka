@@ -24,6 +24,11 @@ contract StandardToken is ERC223 {
         return true;
     }
 
+    function transfer(address _to, uint256 _value, bytes _data) public returns (bool success) {
+        // TODO: implement
+        return true;
+    }
+
     /*
     * @dev Approve the passed address to spend the specified amount of tokens on behalf of msg.sender.
     * @param _spender The address which will spend the funds.
