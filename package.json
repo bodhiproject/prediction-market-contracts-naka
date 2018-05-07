@@ -6,9 +6,7 @@
   "directories": {
     "test": "test"
   },
-  "dependencies": {
-    "solc": "^0.4.23"
-  },
+  "dependencies": {},
   "devDependencies": {},
   "scripts": {
     "test": "truffle test"
