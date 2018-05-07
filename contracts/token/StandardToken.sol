@@ -1,7 +1,9 @@
 pragma solidity ^0.4.23;
 
+import './ERC223.sol';
+import '../lib/SafeMath.sol';
 
-contract StandardToken {
+contract StandardToken is ERC223 {
     using SafeMath for uint256;
 
     mapping(address => uint256) balances;
