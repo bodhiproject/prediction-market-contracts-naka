@@ -43,10 +43,9 @@ contract StandardToken is ERC223 {
         balances[msg.sender] = balances[msg.sender].sub(_value);
         balances[_to] = balances[_to].add(_value);
 
-        // Call token fallback function if _to is a contract
+        // Call token fallback function if _to is a contract. Rejects if not implemented.
         if (codeLength > 0) {
-            ERC223ReceivingContract receiver = ERC223ReceivingContract(_to);
-            receiver.tokenFallback(msg.sender, _value, _data);
+            ERC223ReceivingContract(_to).tokenFallback(msg.sender, _value, _data);
         }
 
         emit Transfer(msg.sender, _to, _value, _data);

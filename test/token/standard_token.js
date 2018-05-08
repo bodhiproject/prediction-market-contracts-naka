@@ -2,6 +2,7 @@ const assert = require('chai').assert;
 const web3 = global.web3;
 
 const StandardTokenMock = artifacts.require('./mock/StandardTokenMock.sol');
+const ERC223ReceiverMock = artifacts.require('./mock/ERC223ReceiverMock.sol');
 const BlockHeightManager = require('../util/block_height_manager');
 const SolAssert = require('../util/sol_assert');
 
@@ -17,12 +18,14 @@ contract('StandardToken', (accounts) => {
   };
 
   let instance;
+  let erc223Receiver;
 
   beforeEach(blockHeightManager.snapshot);
   afterEach(blockHeightManager.revert);
 
   beforeEach(async () => {
     instance = await StandardTokenMock.new(...Object.values(tokenParams), { from: OWNER });
+    erc223Receiver = await ERC223ReceiverMock.new({ from: OWNER });
   });
 
   describe('constructor', async () => {
@@ -32,7 +35,22 @@ contract('StandardToken', (accounts) => {
     });
   });
 
-  describe('transfer', async () => {
+  describe.only('transferERC223', () => {
+    it('should transfer the token and call tokenFallback', async () => {
+      let ownerBalance = tokenParams._initialBalance;
+      assert.equal(await instance.balanceOf(OWNER, { from: OWNER }), ownerBalance);
+      assert.isFalse(await erc223Receiver.tokenFallbackExec.call());
+
+      const transferAmt = 1234567;
+      await instance.transfer(erc223Receiver.address, transferAmt, undefined, { from: OWNER });
+
+      assert.equal(await instance.balanceOf(OWNER), ownerBalance - transferAmt);
+      assert.equal(await instance.balanceOf(erc223Receiver.address), transferAmt);
+      assert.isTrue(await erc223Receiver.tokenFallbackExec.call());
+    });
+  });
+
+  describe('transferERC20', async () => {
     it('should allow transfers if the account has tokens', async () => {
       let ownerBalance = tokenParams._initialBalance;
       assert.equal(await instance.balanceOf(OWNER, { from: OWNER }), ownerBalance);
