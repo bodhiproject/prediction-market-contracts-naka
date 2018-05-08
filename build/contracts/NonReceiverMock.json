@@ -1,0 +1,166 @@
+{
+  "contractName": "NonReceiverMock",
+  "abi": [
+    {
+      "constant": true,
+      "inputs": [],
+      "name": "tokenFallbackExec",
+      "outputs": [
+        {
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "payable": false,
+      "stateMutability": "view",
+      "type": "function"
+    }
+  ],
+  "bytecode": "0x6080604052348015600f57600080fd5b5060ae8061001e6000396000f300608060405260043610603f576000357c0100000000000000000000000000000000000000000000000000000000900463ffffffff1680638124ebe8146044575b600080fd5b348015604f57600080fd5b5060566070565b604051808215151515815260200191505060405180910390f35b6000809054906101000a900460ff16815600a165627a7a723058200e1ce0cec0dfb6ee4aa438e612a258c14615c38877466c84ea794a639ef07c270029",
+  "deployedBytecode": "0x608060405260043610603f576000357c0100000000000000000000000000000000000000000000000000000000900463ffffffff1680638124ebe8146044575b600080fd5b348015604f57600080fd5b5060566070565b604051808215151515815260200191505060405180910390f35b6000809054906101000a900460ff16815600a165627a7a723058200e1ce0cec0dfb6ee4aa438e612a258c14615c38877466c84ea794a639ef07c270029",
+  "sourceMap": "26:63:4:-;;;;8:9:-1;5:2;;;30:1;27;20:12;5:2;26:63:4;;;;;;;",
+  "deployedSourceMap": "26:63:4:-;;;;;;;;;;;;;;;;;;;;;;;;57:29;;8:9:-1;5:2;;;30:1;27;20:12;5:2;57:29:4;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;:::o",
+  "source": "pragma solidity ^0.4.23;\n\ncontract NonReceiverMock {\n    bool public tokenFallbackExec;\n}\n",
+  "sourcePath": "/Users/deric/coding/bodhi-ethereum/contracts/mock/NonReceiverMock.sol",
+  "ast": {
+    "absolutePath": "/Users/deric/coding/bodhi-ethereum/contracts/mock/NonReceiverMock.sol",
+    "exportedSymbols": {
+      "NonReceiverMock": [
+        277
+      ]
+    },
+    "id": 278,
+    "nodeType": "SourceUnit",
+    "nodes": [
+      {
+        "id": 274,
+        "literals": [
+          "solidity",
+          "^",
+          "0.4",
+          ".23"
+        ],
+        "nodeType": "PragmaDirective",
+        "src": "0:24:4"
+      },
+      {
+        "baseContracts": [],
+        "contractDependencies": [],
+        "contractKind": "contract",
+        "documentation": null,
+        "fullyImplemented": true,
+        "id": 277,
+        "linearizedBaseContracts": [
+          277
+        ],
+        "name": "NonReceiverMock",
+        "nodeType": "ContractDefinition",
+        "nodes": [
+          {
+            "constant": false,
+            "id": 276,
+            "name": "tokenFallbackExec",
+            "nodeType": "VariableDeclaration",
+            "scope": 277,
+            "src": "57:29:4",
+            "stateVariable": true,
+            "storageLocation": "default",
+            "typeDescriptions": {
+              "typeIdentifier": "t_bool",
+              "typeString": "bool"
+            },
+            "typeName": {
+              "id": 275,
+              "name": "bool",
+              "nodeType": "ElementaryTypeName",
+              "src": "57:4:4",
+              "typeDescriptions": {
+                "typeIdentifier": "t_bool",
+                "typeString": "bool"
+              }
+            },
+            "value": null,
+            "visibility": "public"
+          }
+        ],
+        "scope": 278,
+        "src": "26:63:4"
+      }
+    ],
+    "src": "0:90:4"
+  },
+  "legacyAST": {
+    "absolutePath": "/Users/deric/coding/bodhi-ethereum/contracts/mock/NonReceiverMock.sol",
+    "exportedSymbols": {
+      "NonReceiverMock": [
+        277
+      ]
+    },
+    "id": 278,
+    "nodeType": "SourceUnit",
+    "nodes": [
+      {
+        "id": 274,
+        "literals": [
+          "solidity",
+          "^",
+          "0.4",
+          ".23"
+        ],
+        "nodeType": "PragmaDirective",
+        "src": "0:24:4"
+      },
+      {
+        "baseContracts": [],
+        "contractDependencies": [],
+        "contractKind": "contract",
+        "documentation": null,
+        "fullyImplemented": true,
+        "id": 277,
+        "linearizedBaseContracts": [
+          277
+        ],
+        "name": "NonReceiverMock",
+        "nodeType": "ContractDefinition",
+        "nodes": [
+          {
+            "constant": false,
+            "id": 276,
+            "name": "tokenFallbackExec",
+            "nodeType": "VariableDeclaration",
+            "scope": 277,
+            "src": "57:29:4",
+            "stateVariable": true,
+            "storageLocation": "default",
+            "typeDescriptions": {
+              "typeIdentifier": "t_bool",
+              "typeString": "bool"
+            },
+            "typeName": {
+              "id": 275,
+              "name": "bool",
+              "nodeType": "ElementaryTypeName",
+              "src": "57:4:4",
+              "typeDescriptions": {
+                "typeIdentifier": "t_bool",
+                "typeString": "bool"
+              }
+            },
+            "value": null,
+            "visibility": "public"
+          }
+        ],
+        "scope": 278,
+        "src": "26:63:4"
+      }
+    ],
+    "src": "0:90:4"
+  },
+  "compiler": {
+    "name": "solc",
+    "version": "0.4.23+commit.124ca40d.Emscripten.clang"
+  },
+  "networks": {},
+  "schemaVersion": "2.0.0",
+  "updatedAt": "2018-05-08T00:30:36.427Z"
+}
