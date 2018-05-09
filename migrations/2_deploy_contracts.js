@@ -1,5 +1,5 @@
-const BodhiToken = artifacts.require("./token/BodhiToken.sol");
+const BodhiEthereum = artifacts.require("./token/BodhiEthereum.sol");
 
 module.exports = function(deployer) {
-  deployer.deploy(BodhiToken);
+  deployer.deploy(BodhiEthereum);
 };
