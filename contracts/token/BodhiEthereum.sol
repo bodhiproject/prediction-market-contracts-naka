@@ -2,7 +2,7 @@ pragma solidity ^0.4.23;
 
 import './MintableToken.sol';
 
-contract BodhiToken is MintableToken {
+contract BodhiEthereum is MintableToken {
     // Token configurations
     string public constant name = "Bodhi Ethereum";
     string public constant symbol = "BOE";

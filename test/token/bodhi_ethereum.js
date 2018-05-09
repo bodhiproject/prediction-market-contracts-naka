@@ -5,7 +5,7 @@ const BlockHeightManager = require('../util/block_height_manager');
 const Utils = require('../util/utils');
 const SolAssert = require('../util/sol_assert');
 
-contract('BodhiToken', (accounts) => {
+contract('BodhiEthereum', (accounts) => {
   const blockHeightManager = new BlockHeightManager(web3);
   const OWNER = accounts[0];
 
@@ -20,7 +20,7 @@ contract('BodhiToken', (accounts) => {
     decimals = await token.decimals.call();
   });
 
-  describe('Initialization', async () => {
+  describe('constructor', async () => {
     it('initializes all the values', async () => {
       assert.equal(await token.owner.call(), OWNER);
 
