@@ -1,6 +1,5 @@
-const BodhiToken = artifacts.require("./tokens/BodhiToken.sol");
-const SafeMath = artifacts.require("./libs/SafeMath.sol");
+const BodhiToken = artifacts.require("./token/BodhiToken.sol");
 
 module.exports = function(deployer) {
-    deployer.deploy(BodhiToken);
+  deployer.deploy(BodhiToken);
 };

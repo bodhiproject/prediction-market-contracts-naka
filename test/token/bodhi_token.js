@@ -7,7 +7,7 @@ const SolAssert = require('../util/sol_assert');
 
 contract('BodhiToken', (accounts) => {
   const blockHeightManager = new BlockHeightManager(web3);
-  const owner = accounts[0];
+  const OWNER = accounts[0];
 
   let token;
   let decimals;
@@ -16,71 +16,65 @@ contract('BodhiToken', (accounts) => {
   afterEach(blockHeightManager.revert);
 
   beforeEach(async () => {
-    token = await BodhiToken.deployed({ from: owner });
+    token = await BodhiToken.deployed({ from: OWNER });
     decimals = await token.decimals.call();
   });
 
   describe('Initialization', async () => {
     it('initializes all the values', async () => {
+      assert.equal(await token.owner.call(), OWNER);
+
       const tokenTotalSupply = await token.tokenTotalSupply.call();
       const expectedTokenTotalSupply = Utils.getBigNumberWithDecimals(100e6, decimals);
-      assert.equal(tokenTotalSupply.toString(), expectedTokenTotalSupply.toString(), 'tokenTotalSupply does not match');
+      assert.equal(tokenTotalSupply.toString(), expectedTokenTotalSupply.toString());
     });
   });
 
   describe('mint', () => {
-    it('allows only the owner to mint tokens', async () => {
-      let totalSupply = await token.totalSupply.call();
-      assert.equal(totalSupply.toString(), 0, 'Initial totalSupply should be 0');
+    it('allows the owner to mint tokens', async () => {
+      assert.equal((await token.totalSupply.call()).toString(), 0);
 
-      const tokenTotalSupply = await token.tokenTotalSupply.call();
-      await token.mintByOwner(owner, tokenTotalSupply, { from: owner });
-
-      totalSupply = await token.totalSupply.call();
-      assert.equal(totalSupply.toString(), tokenTotalSupply.toString(), 'totalSupply should equal tokenTotalSupply');
+      const mintAmt = 12345678;
+      await token.mint(OWNER, mintAmt, { from: OWNER });
+      assert.equal((await token.totalSupply.call()).toString(), mintAmt.toString());
     });
 
-    it('does not allow an address other than the owner to mint tokens', async () => {
-      let totalSupply = await token.totalSupply.call();
-      assert.equal(totalSupply.toString(), 0, 'totalSupply should be 0');
+    it('does not allow a non-owner to mint tokens', async () => {
+      assert.equal((await token.totalSupply.call()).toString(), 0);
 
       try {
-        await token.mintByOwner(accounts[1], 1, { from: accounts[1] });
+        await token.mint(accounts[1], 1, { from: accounts[1] });
         assert.fail();
       } catch (e) {
         SolAssert.assertRevert(e);
       }
 
       try {
-        await token.mintByOwner(accounts[2], 1, { from: accounts[2] });
+        await token.mint(accounts[2], 1, { from: accounts[2] });
         assert.fail();
       } catch (e) {
         SolAssert.assertRevert(e);
       }
 
-      totalSupply = await token.totalSupply.call();
-      assert.equal(totalSupply.toString(), 0, 'totalSupply should be 0');
+      assert.equal((await token.totalSupply.call()).toString(), 0);
     });
 
     it('throws if trying to mint more than the tokenTotalSupply', async () => {
-      let totalSupply = await token.totalSupply.call();
-      assert.equal(totalSupply.toString(), 0, 'totalSupply should be 0');
+      assert.equal(await token.totalSupply.call(), 0);
 
       const tokenTotalSupply = await token.tokenTotalSupply.call();
-      await token.mintByOwner(owner, tokenTotalSupply, { from: owner });
-
-      totalSupply = await token.totalSupply.call();
-      assert.equal(totalSupply.toString(), tokenTotalSupply.toString(), 'totalSupply should equal tokenTotalSupply');
+      await token.mint(OWNER, tokenTotalSupply, { from: OWNER });
+      assert.equal((await token.totalSupply.call()).toString(), tokenTotalSupply.toString());
 
       try {
-        await token.mintByOwner(owner, 1, { from: owner });
+        await token.mint(OWNER, 1, { from: OWNER });
         assert.fail();
       } catch (e) {
         SolAssert.assertRevert(e);
       }
 
       totalSupply = await token.totalSupply.call();
-      assert.equal(totalSupply.toString(), tokenTotalSupply.toString(), 'totalSupply should equal tokenTotalSupply');
+      assert.equal(totalSupply.toString(), tokenTotalSupply.toString());
     });
   });
 });
