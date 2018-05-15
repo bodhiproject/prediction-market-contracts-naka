@@ -6,7 +6,7 @@ const Wallet = require('ethereumjs-wallet');
 const web3 = new Web3();
 const mainnetPrivKey = new Buffer(process.env['MEW_MAINNET_KEY'], 'hex');
 const mainnetWallet = Wallet.fromPrivateKey(mainnetPrivKey);
-const mainnetProvider = new WalletProvider(mainNetWallet, "https://mainnet.infura.io/jf36VtmNV1eWuSHOMvMT");
+const mainnetProvider = new WalletProvider(mainnetWallet, "https://mainnet.infura.io/jf36VtmNV1eWuSHOMvMT");
 
 module.exports = {
   // See <http://truffleframework.com/docs/advanced/configuration>
