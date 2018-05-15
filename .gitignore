@@ -164,3 +164,6 @@ $RECYCLE.BIN/
 
 ### Truffle
 build/
+
+### Dotenv
+.env
