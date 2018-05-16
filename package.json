@@ -8,7 +8,10 @@
   },
   "dependencies": {
     "bluebird": "^3.5.1",
-    "chai": "^4.1.2"
+    "chai": "^4.1.2",
+    "dotenv": "^5.0.1",
+    "ethereumjs-wallet": "^0.6.0",
+    "truffle-wallet-provider": "0.0.5"
   },
   "devDependencies": {},
   "scripts": {
