@@ -1,6 +1,6 @@
 const assert = require('chai').assert;
 
-const BodhiToken = artifacts.require('./token/BodhiToken.sol');
+const BodhiEthereum = artifacts.require('./token/BodhiEthereum.sol');
 const BlockHeightManager = require('../util/block_height_manager');
 const Utils = require('../util/utils');
 const SolAssert = require('../util/sol_assert');
@@ -16,7 +16,7 @@ contract('BodhiEthereum', (accounts) => {
   afterEach(blockHeightManager.revert);
 
   beforeEach(async () => {
-    token = await BodhiToken.deployed({ from: OWNER });
+    token = await BodhiEthereum.deployed({ from: OWNER });
     decimals = await token.decimals.call();
   });
 
