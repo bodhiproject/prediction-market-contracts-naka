@@ -48,6 +48,7 @@ contract StandardToken is ERC223 {
             ERC223ReceivingContract(_to).tokenFallback(msg.sender, _value, _data);
         }
 
+        emit Transfer(msg.sender, _to, _value);
         emit Transfer(msg.sender, _to, _value, _data);
         return true;
     }
