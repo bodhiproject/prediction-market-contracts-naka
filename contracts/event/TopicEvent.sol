@@ -3,7 +3,7 @@ pragma solidity ^0.4.24;
 import "./ITopicEvent.sol";
 import "../BaseContract.sol";
 import "../storage/IAddressManager.sol";
-import "../oracles/IOracleFactory.sol";
+import "../oracle/IOracleFactory.sol";
 import "../token/ERC20.sol";
 import "../lib/Ownable.sol";
 import "../lib/SafeMath.sol";
