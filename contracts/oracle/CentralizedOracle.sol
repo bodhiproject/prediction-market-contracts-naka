@@ -87,24 +87,40 @@ contract CentralizedOracle is Oracle {
         emit OracleResultVoted(version, address(this), _bettor, _resultIndex, _amount, QTUM);
     }
 
-    /// @notice CentralizedOracle should call this to set the result. Requires the Oracle to approve() BOT in the amount 
-    ///         of the consensus threshold.
-    /// @param _resultIndex The index of the result to set.
-    function setResult(uint8 _resultIndex) external validResultIndex(_resultIndex) isNotFinished() {
+    /// @dev Validate a set result. Must be called from TopicEvent.
+    /// @param _resultSetter Entity who is setting the result.
+    /// @param _resultIndex Index of result to set.
+    /// @param _amount Amount of tokens used to set the result.
+    function validateSetResult(address _resultSetter, uint8 _resultIndex, uint256 _amount)
+        external
+        isAuthorized(msg.sender)
+        validAddress(_resultSetter)
+        validResultIndex(_resultIndex)
+        isNotFinished()
+        returns (bool isValid)
+    {
         require(block.timestamp >= resultSettingStartTime);
         if (block.timestamp < resultSettingEndTime) {
-            require(msg.sender == oracle);
+            require(_resultSetter == oracle);
         }
+        require (_amount >= consensusThreshold);
+        return true;
+    }
 
+    /// @dev Records the setResult. Must be called from TopicEvent.
+    /// @param _resultSetter Entity who is setting the result.
+    /// @param _resultIndex The index of the result to set.
+    /// @param _amount Amount of tokens used to set the result.
+    function recordSetResult(address _resultSetter, uint8 _resultIndex, uint256 _amount)
+        external
+        isAuthorized(msg.sender)
+    {
         finished = true;
         resultIndex = _resultIndex;
+        balances[_resultIndex].totalVotes = balances[_resultIndex].totalVotes.add(_amount);
+        balances[_resultIndex].votes[_resultSetter] = balances[_resultIndex].votes[_resultSetter].add(_amount);
 
-        balances[_resultIndex].totalVotes = balances[_resultIndex].totalVotes.add(consensusThreshold);
-        balances[_resultIndex].votes[msg.sender] = balances[_resultIndex].votes[msg.sender]
-            .add(consensusThreshold);
-
-        ITopicEvent(eventAddress).centralizedOracleSetResult(msg.sender, _resultIndex, consensusThreshold);
-        emit OracleResultVoted(version, address(this), msg.sender, _resultIndex, consensusThreshold, BOT);
+        emit OracleResultVoted(version, address(this), _resultSetter, _resultIndex, _amount, BOT);
         emit OracleResultSet(version, address(this), _resultIndex);
     }
 }

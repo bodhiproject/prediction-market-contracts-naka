@@ -6,6 +6,7 @@ import "../storage/IAddressManager.sol";
 import "../oracle/IOracleFactory.sol";
 import "../oracle/ICentralizedOracle.sol";
 import "../token/ERC20.sol";
+import "../token/ERC223ReceivingContract.sol";
 import "../lib/Ownable.sol";
 import "../lib/SafeMath.sol";
 import "../lib/ByteUtils.sol";
@@ -121,49 +122,60 @@ contract TopicEvent is ITopicEvent, BaseContract, Ownable {
         revert();
     }
 
-    /// @dev Places a bet.
-    /// @param _oracleAddress Address of the CentralizedOracle.
-    /// @param _resultIndex Index of result to bet on.
-    function bet(address _oracleAddress, uint8 _resultIndex) external payable {
-        bool isValid = ICentralizedOracle(_oracleAddress).validateBet(msg.sender, _resultIndex, msg.value);
-
-        if (isValid) {
-            balances[_resultIndex].totalBets = balances[_resultIndex].totalBets.add(msg.value);
-            balances[_resultIndex].bets[msg.sender] = balances[_resultIndex].bets[msg.sender].add(msg.value);
-            totalQtumValue = totalQtumValue.add(msg.value);
-
-            ICentralizedOracle(_oracleAddress).recordBet(msg.sender, _resultIndex, msg.value);
-        }
+    /// @dev Standard ERC223 function that will handle incoming token transfers.
+    /// @param _from Token sender address.
+    /// @param _value Amount of tokens.
+    /// @param _data Transaction metadata.
+    function tokenFallback(address _from, uint _value, bytes _data) external {
+        // TODO: handle setResult call
+        // TODO: handle vote call
     }
 
-    /// @dev CentralizedOracle contract can call this method to set the result.
-    /// @param _oracle The address of the CentralizedOracle.
-    /// @param _resultIndex The index of the result to set.
-    /// @param _consensusThreshold The BOT threshold that the CentralizedOracle has to contribute to validate the result.
-    function centralizedOracleSetResult(
-        address _oracle, 
-        uint8 _resultIndex, 
+    /// @dev Places a bet.
+    /// @param _centralizedOracle Address of the CentralizedOracle.
+    /// @param _resultIndex Index of result to bet on.
+    function bet(address _centralizedOracle, uint8 _resultIndex) external payable {
+        bool isValid = ICentralizedOracle(_centralizedOracle).validateBet(msg.sender, _resultIndex, msg.value);
+        assert(isValid);
+
+        balances[_resultIndex].totalBets = balances[_resultIndex].totalBets.add(msg.value);
+        balances[_resultIndex].bets[msg.sender] = balances[_resultIndex].bets[msg.sender].add(msg.value);
+        totalQtumValue = totalQtumValue.add(msg.value);
+
+        ICentralizedOracle(_centralizedOracle).recordBet(msg.sender, _resultIndex, msg.value);
+    }
+
+    /// @dev Set the result as the result setter. tokenFallback should be calling this.
+    /// @param _centralizedOracle Address of the CentralizedOracle contract.
+    /// @param _resultSetter Entity who is setting the result.
+    /// @param _resultIndex Index of the result to set.
+    /// @param _consensusThreshold Threshold that the result setter is voting to validate the result.
+    function setResult(
+        address _centralizedOracle,
+        address _resultSetter,
+        uint8 _resultIndex,
         uint256 _consensusThreshold)
-        external 
-        validResultIndex(_resultIndex)
-        fromCentralizedOracle()
+        external
     {
         require(!oracles[0].didSetResult);
         require(status == Status.Betting);
 
-        ERC20 token = ERC20(addressManager.bodhiTokenAddress());
-        require(token.allowance(_oracle, address(this)) >= _consensusThreshold);
+        bool isValid = ICentralizedOracle(_centralizedOracle)
+            .validateSetResult(_resultSetter, _resultIndex, _consensusThreshold);
+        assert(isValid);
 
+        // Update statuses and current result
         oracles[0].didSetResult = true;
         status = Status.OracleVoting;
         resultIndex = _resultIndex;
 
+        // Update balances
         balances[_resultIndex].totalVotes = balances[_resultIndex].totalVotes.add(_consensusThreshold);
-        balances[_resultIndex].votes[_oracle] = balances[_resultIndex].votes[_oracle].add(_consensusThreshold);
+        balances[_resultIndex].votes[_resultSetter] = balances[_resultIndex].votes[_resultSetter]
+            .add(_consensusThreshold);
         totalBotValue = totalBotValue.add(_consensusThreshold);
 
-        token.transferFrom(_oracle, address(this), _consensusThreshold);
-
+        // Deploy DecentralizedOracle
         uint256 increment = addressManager.thresholdPercentIncrease().mul(_consensusThreshold).div(100);
         createDecentralizedOracle(_consensusThreshold.add(increment));
     }
