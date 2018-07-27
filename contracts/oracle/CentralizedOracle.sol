@@ -58,18 +58,33 @@ contract CentralizedOracle is Oracle {
         revert();
     }
 
-    /// @notice Allows betting on a result using the blockchain token.
+    /// @dev Validate a bet. Must be called from TopicEvent.
+    /// @param _bettor The entity who is placing the bet.
     /// @param _resultIndex The index of result to bet on.
-    function bet(uint8 _resultIndex) external payable validResultIndex(_resultIndex) isNotFinished() {
+    /// @param _amount The amount of the bet.
+    function validateBet(address _bettor, uint8 _resultIndex, uint256 _amount)
+        external
+        isAuthorized(msg.sender)
+        validAddress(_bettor)
+        validResultIndex(_resultIndex)
+        isNotFinished()
+        returns (bool isValid)
+    {
         require(block.timestamp >= bettingStartTime);
         require(block.timestamp < bettingEndTime);
-        require(msg.value > 0);
+        require(_amount > 0);
+        return true;
+    }
 
-        balances[_resultIndex].totalBets = balances[_resultIndex].totalBets.add(msg.value);
-        balances[_resultIndex].bets[msg.sender] = balances[_resultIndex].bets[msg.sender].add(msg.value);
+    /// @dev Records the bet. Must be called from TopicEvent.
+    /// @param _bettor The entity who is placing the bet.
+    /// @param _resultIndex The index of result to bet on.
+    /// @param _amount The amount of the bet.
+    function recordBet(address _bettor, uint8 _resultIndex, uint256 _amount) external isAuthorized(msg.sender) {
+        balances[_resultIndex].totalBets = balances[_resultIndex].totalBets.add(_amount);
+        balances[_resultIndex].bets[_bettor] = balances[_resultIndex].bets[_bettor].add(_amount);
 
-        ITopicEvent(eventAddress).betFromOracle.value(msg.value)(msg.sender, _resultIndex);
-        emit OracleResultVoted(version, address(this), msg.sender, _resultIndex, msg.value, QTUM);
+        emit OracleResultVoted(version, address(this), _bettor, _resultIndex, _amount, QTUM);
     }
 
     /// @notice CentralizedOracle should call this to set the result. Requires the Oracle to approve() BOT in the amount 

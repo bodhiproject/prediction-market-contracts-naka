@@ -4,6 +4,7 @@ import "./ITopicEvent.sol";
 import "../BaseContract.sol";
 import "../storage/IAddressManager.sol";
 import "../oracle/IOracleFactory.sol";
+import "../oracle/ICentralizedOracle.sol";
 import "../token/ERC20.sol";
 import "../lib/Ownable.sol";
 import "../lib/SafeMath.sol";
@@ -120,21 +121,19 @@ contract TopicEvent is ITopicEvent, BaseContract, Ownable {
         revert();
     }
 
-    /// @dev CentralizedOracle contract can call this method to bet.
-    /// @param _better The address that is placing the bet.
-    /// @param _resultIndex The index of result to bet on.
-    function betFromOracle(address _better, uint8 _resultIndex) 
-        external 
-        payable
-        validAddress(_better)
-        validResultIndex(_resultIndex)
-        fromCentralizedOracle()
-    {
-        require(msg.value > 0);
+    /// @dev Places a bet.
+    /// @param _oracleAddress Address of the CentralizedOracle.
+    /// @param _resultIndex Index of result to bet on.
+    function bet(address _oracleAddress, uint8 _resultIndex) external payable {
+        bool isValid = ICentralizedOracle(_oracleAddress).validateBet(msg.sender, _resultIndex, msg.value);
 
-        balances[_resultIndex].totalBets = balances[_resultIndex].totalBets.add(msg.value);
-        balances[_resultIndex].bets[_better] = balances[_resultIndex].bets[_better].add(msg.value);
-        totalQtumValue = totalQtumValue.add(msg.value);
+        if (isValid) {
+            balances[_resultIndex].totalBets = balances[_resultIndex].totalBets.add(msg.value);
+            balances[_resultIndex].bets[msg.sender] = balances[_resultIndex].bets[msg.sender].add(msg.value);
+            totalQtumValue = totalQtumValue.add(msg.value);
+
+            ICentralizedOracle(_oracleAddress).recordBet(msg.sender, _resultIndex, msg.value);
+        }
     }
 
     /// @dev CentralizedOracle contract can call this method to set the result.
