@@ -116,7 +116,7 @@ contract StandardEvent is BaseContract, Ownable {
     /// @dev Standard ERC223 function that will handle incoming token transfers.
     /// @param _from Token sender address.
     /// @param _value Amount of tokens.
-    /// @param _data Transaction metadata.
+    /// @param _data The message data. First 4 bytes is function hash & rest is function params.
     function tokenFallback(address _from, uint _value, bytes _data) external {
         bytes memory functionId = _data.slice(0, 4);
         bytes memory setResultFunc = hex"65f4ced1";
