@@ -194,16 +194,21 @@ contract TopicEvent is BaseContract, Ownable {
         }
     }
 
-    /// @dev The last DecentralizedOracle contract can call this method to change status to Collection.
-    /// @return Flag to indicate success of finalizing the result.
-    function decentralizedOracleFinalizeResult() external returns (bool) {
+    /// @dev Finalizes the current result.
+    /// @param _decentralizedOracle Address of the DecentralizedOracle contract.
+    function finalizeResult(address _decentralizedOracle) external {
         require(status == Status.OracleVoting);
+        bool isValid = IDecentralizedOracle(_decentralizedOracle).validateFinalize();
+        assert(isValid);
 
+        // Update status
         status = Status.Collection;
- 
-        emit FinalResultSet(version, address(this), resultIndex);
 
-        return true;
+        // Record result in DecentralizedOracle
+        uint8 lastResultIndex = IDecentralizedOracle(_decentralizedOracle).lastResultIndex();
+        IDecentralizedOracle(_decentralizedOracle).recordSetResult(lastResultIndex, false);
+ 
+        emit FinalResultSet(version, address(this), lastResultIndex);
     }
 
     /// @notice Allows winners of the Event to withdraw their QTUM and BOT winnings after the final result is set.
@@ -321,7 +326,7 @@ contract TopicEvent is BaseContract, Ownable {
         resultIndex = _resultIndex;
 
         // Record result in DecentralizedOracle
-        IDecentralizedOracle(_decentralizedOracle).recordSetResult(_resultIndex);
+        IDecentralizedOracle(_decentralizedOracle).recordSetResult(_resultIndex, true);
 
         // Deploy new DecentralizedOracle
         uint256 increment = addressManager.thresholdPercentIncrease().mul(_currentConsensusThreshold).div(100);

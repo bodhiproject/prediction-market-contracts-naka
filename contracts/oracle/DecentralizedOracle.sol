@@ -74,25 +74,27 @@ contract DecentralizedOracle is IDecentralizedOracle, Oracle {
         return (balances[_resultIndex].totalVotes >= consensusThreshold, consensusThreshold);
     }
 
-    /// @dev Records the result. Votes on a result hit the consensusThreshold. Must be called from TopicEvent.
+    /// @dev Records the result. Must be called from TopicEvent.
     /// @param _resultIndex Index of the result to set.
-    function recordSetResult(uint8 _resultIndex) external isEventCaller(msg.sender) {
+    /// @param _emitResultSetEvent Should the event OracleResultSet be emitted.
+    function recordSetResult(uint8 _resultIndex, bool _emitResultSetEvent) external isEventCaller(msg.sender) {
         finished = true;
         resultIndex = _resultIndex;
 
-        emit OracleResultSet(version, address(this), _resultIndex);
+        if (_emitResultSetEvent) {
+            emit OracleResultSet(version, address(this), _resultIndex);
+        }
     }
 
-    /// @notice This can be called by anyone if this VotingOracle did not meet the consensus threshold and has reached 
-    ///         the arbitration end time. This finishes the Event and allows winners to withdraw their winnings from the 
-    ///         Event contract.
-    /// @return Flag to indicate success of finalizing the result.
-    function finalizeResult() external isNotFinished() {
+    /// @dev Validate a finalize. Must be called from TopicEvent.
+    /// @return Is validated.
+    function validateFinalize()
+        external
+        isEventCaller(msg.sender)
+        isNotFinished()
+        returns (bool isValid)
+    {
         require(block.timestamp >= arbitrationEndTime);
-
-        finished = true;
-        resultIndex = lastResultIndex;
-
-        ITopicEvent(eventAddress).decentralizedOracleFinalizeResult();
+        return true;
     }
 }
