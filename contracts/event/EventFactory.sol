@@ -1,6 +1,6 @@
 pragma solidity ^0.4.24;
 
-import "./TopicEvent.sol";
+import "./StandardEvent.sol";
 import "../storage/IAddressManager.sol";
 
 /// @title Event Factory allows the creation of individual prediction events.
@@ -9,12 +9,12 @@ contract EventFactory {
 
     uint16 public version;
     address private addressManager;
-    mapping(bytes32 => TopicEvent) public topics;
+    mapping(bytes32 => StandardEvent) public events;
 
     // Events
-    event TopicCreated(
+    event StandardEventCreated(
         uint16 indexed _version,
-        address indexed _topicAddress, 
+        address indexed _eventAddress, 
         address indexed _creatorAddress,
         bytes32[10] _name, 
         bytes32[11] _resultNames,
@@ -29,7 +29,7 @@ contract EventFactory {
         version = IAddressManager(addressManager).currentEventFactoryIndex();
     }
     
-    function createTopic(
+    function createStandardEvent(
         address _oracle, 
         bytes32[10] _name, 
         bytes32[10] _resultNames, 
@@ -38,7 +38,7 @@ contract EventFactory {
         uint256 _resultSettingStartTime,
         uint256 _resultSettingEndTime)
         public
-        returns (TopicEvent topicEvent) 
+        returns (StandardEvent sEvent) 
     {
         require(!_name[0].isEmpty());
         require(!_resultNames[0].isEmpty());
@@ -59,28 +59,28 @@ contract EventFactory {
             }
         }
 
-        bytes32 topicHash = getTopicHash(
+        bytes32 eventHash = getStandardEventHash(
             _name, resultNames, numOfResults, _bettingStartTime, _bettingEndTime, _resultSettingStartTime,
             _resultSettingEndTime);
-        // Topic should not exist yet
-        require(address(topics[topicHash]) == 0);
+        // Event should not exist yet
+        require(address(events[eventHash]) == 0);
 
         IAddressManager(addressManager).transferEscrow(msg.sender);
 
-        TopicEvent topic = new TopicEvent(version, msg.sender, _oracle, _name, resultNames, numOfResults, 
+        StandardEvent standardEvent = new StandardEvent(version, msg.sender, _oracle, _name, resultNames, numOfResults, 
             _bettingStartTime, _bettingEndTime, _resultSettingStartTime, _resultSettingEndTime, addressManager);
-        topics[topicHash] = topic;
+        events[eventHash] = standardEvent;
 
-        IAddressManager(addressManager).addWhitelistContract(address(topic));
+        IAddressManager(addressManager).addWhitelistContract(address(standardEvent));
 
-        emit TopicCreated(
-            version, address(topic), msg.sender, _name, resultNames, numOfResults,
+        emit StandardEventCreated(
+            version, address(standardEvent), msg.sender, _name, resultNames, numOfResults,
             IAddressManager(addressManager).eventEscrowAmount());
 
-        return topic;
+        return standardEvent;
     }
 
-    function getTopicHash(
+    function getStandardEventHash(
         bytes32[10] _name, 
         bytes32[11] _resultNames, 
         uint8 _numOfResults,

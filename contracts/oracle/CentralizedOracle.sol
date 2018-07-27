@@ -54,7 +54,7 @@ contract CentralizedOracle is ICentralizedOracle, Oracle {
         consensusThreshold = _consensusThreshold;
     }
 
-    /// @dev Validate a bet. Must be called from TopicEvent.
+    /// @dev Validate a bet. Must be called from Event.
     /// @param _bettor The entity who is placing the bet.
     /// @param _resultIndex The index of result to bet on.
     /// @param _amount The amount of the bet.
@@ -73,7 +73,7 @@ contract CentralizedOracle is ICentralizedOracle, Oracle {
         return true;
     }
 
-    /// @dev Records the bet. Must be called from TopicEvent.
+    /// @dev Records the bet. Must be called from Event.
     /// @param _bettor The entity who is placing the bet.
     /// @param _resultIndex The index of result to bet on.
     /// @param _amount The amount of the bet.
@@ -84,7 +84,7 @@ contract CentralizedOracle is ICentralizedOracle, Oracle {
         emit OracleResultVoted(version, address(this), _bettor, _resultIndex, _amount, ETH);
     }
 
-    /// @dev Validate a set result. Must be called from TopicEvent.
+    /// @dev Validate a set result. Must be called from Event.
     /// @param _resultSetter Entity who is setting the result.
     /// @param _resultIndex Index of result to set.
     /// @param _amount Amount of tokens used to set the result.
@@ -105,7 +105,7 @@ contract CentralizedOracle is ICentralizedOracle, Oracle {
         return true;
     }
 
-    /// @dev Records the result. Must be called from TopicEvent.
+    /// @dev Records the result. Must be called from Event.
     /// @param _resultSetter Entity who is setting the result.
     /// @param _resultIndex The index of the result to set.
     /// @param _amount Amount of tokens used to set the result.

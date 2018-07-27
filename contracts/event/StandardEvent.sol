@@ -11,7 +11,7 @@ import "../lib/Ownable.sol";
 import "../lib/SafeMath.sol";
 import "../lib/ByteUtils.sol";
 
-contract TopicEvent is BaseContract, Ownable {
+contract StandardEvent is BaseContract, Ownable {
     using ByteUtils for bytes32;
     using SafeMath for uint256;
 
@@ -57,7 +57,7 @@ contract TopicEvent is BaseContract, Ownable {
         _;
     }
 
-    /// @notice Creates new TopicEvent contract.
+    /// @notice Creates new StandardEvent contract.
     /// @param _version The contract version.
     /// @param _owner The address of the owner.
     /// @param _centralizedOracle The address of the CentralizedOracle that will decide the result.

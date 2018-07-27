@@ -1,7 +1,6 @@
 pragma solidity ^0.4.24;
 
 import "../BaseContract.sol";
-import "../event/ITopicEvent.sol";
 import "../lib/Ownable.sol";
 import "../lib/SafeMath.sol";
 

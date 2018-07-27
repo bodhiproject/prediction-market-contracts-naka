@@ -39,7 +39,7 @@ contract DecentralizedOracle is IDecentralizedOracle, Oracle {
         consensusThreshold = _consensusThreshold;
     }
 
-    /// @dev Validate a vote. Must be called from TopicEvent.
+    /// @dev Validate a vote. Must be called from Event.
     /// @param _voter Entity who is voting.
     /// @param _resultIndex Index of result to vote.
     /// @param _amount Amount of tokens used to vote.
@@ -58,7 +58,7 @@ contract DecentralizedOracle is IDecentralizedOracle, Oracle {
         return true;
     }
 
-    /// @dev Records the vote. Must be called from TopicEvent.
+    /// @dev Records the vote. Must be called from Event.
     /// @param _voter Entity who is voting.
     /// @param _resultIndex Index of result to vote.
     /// @param _amount Amount of tokens used to vote.
@@ -76,7 +76,7 @@ contract DecentralizedOracle is IDecentralizedOracle, Oracle {
         return (balances[_resultIndex].totalVotes >= consensusThreshold, consensusThreshold);
     }
 
-    /// @dev Records the result. Must be called from TopicEvent.
+    /// @dev Records the result. Must be called from Event.
     /// @param _resultIndex Index of the result to set.
     /// @param _emitResultSetEvent Should the event OracleResultSet be emitted.
     function recordSetResult(uint8 _resultIndex, bool _emitResultSetEvent) external isEventCaller(msg.sender) {
@@ -88,7 +88,7 @@ contract DecentralizedOracle is IDecentralizedOracle, Oracle {
         }
     }
 
-    /// @dev Validate a finalize. Must be called from TopicEvent.
+    /// @dev Validate a finalize. Must be called from Event.
     /// @return Is validated.
     function validateFinalize()
         external
