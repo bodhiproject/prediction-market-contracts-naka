@@ -25,11 +25,6 @@ contract TopicEvent is BaseContract, Ownable {
         Collection
     }
 
-    struct Oracle {
-        address oracleAddress;
-        bool didSetResult;
-    }
-
     // Amount of QTUM to be distributed to BOT winners
     uint8 public constant QTUM_PERCENTAGE = 1;
 
@@ -41,7 +36,6 @@ contract TopicEvent is BaseContract, Ownable {
     uint256 public totalBotValue;
     uint256 public escrowAmount;
     IAddressManager private addressManager;
-    Oracle[] public oracles;
     mapping(address => bool) public didWithdraw;
 
     // Events
@@ -153,7 +147,6 @@ contract TopicEvent is BaseContract, Ownable {
         uint256 _consensusThreshold)
         external
     {
-        require(!oracles[0].didSetResult);
         require(status == Status.Betting);
 
         bool isValid = ICentralizedOracle(_centralizedOracle)
@@ -161,7 +154,6 @@ contract TopicEvent is BaseContract, Ownable {
         assert(isValid);
 
         // Update statuses and current result
-        oracles[0].didSetResult = true;
         status = Status.OracleVoting;
         resultIndex = _resultIndex;
 
@@ -205,7 +197,6 @@ contract TopicEvent is BaseContract, Ownable {
     /// @dev The last DecentralizedOracle contract can call this method to change status to Collection.
     /// @return Flag to indicate success of finalizing the result.
     function decentralizedOracleFinalizeResult() external returns (bool) {
-        require(msg.sender == oracles[oracles.length - 1].oracleAddress);
         require(status == Status.OracleVoting);
 
         status = Status.Collection;
@@ -304,12 +295,7 @@ contract TopicEvent is BaseContract, Ownable {
         address newOracle = IOracleFactory(oracleFactory).createCentralizedOracle(address(this), 
             numOfResults, _centralizedOracle, _bettingStartTime, _bettingEndTime, _resultSettingStartTime, 
             _resultSettingEndTime, addressManager.startingOracleThreshold());
-        
         assert(newOracle != address(0));
-        oracles.push(Oracle({
-            oracleAddress: newOracle,
-            didSetResult: false
-            }));
     }
 
     function createDecentralizedOracle(uint256 _consensusThreshold) private {
@@ -317,12 +303,7 @@ contract TopicEvent is BaseContract, Ownable {
         uint256 arbitrationLength = addressManager.arbitrationLength();
         address newOracle = IOracleFactory(oracleFactory).createDecentralizedOracle(address(this), numOfResults, 
             resultIndex, block.timestamp.add(arbitrationLength), _consensusThreshold);
-
         assert(newOracle != address(0));
-        oracles.push(Oracle({
-            oracleAddress: newOracle,
-            didSetResult: false
-            }));
     }
 
     /// @dev Sets the result of the DecentralizedOracle and creates a new one.
