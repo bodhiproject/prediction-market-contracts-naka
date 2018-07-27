@@ -14,7 +14,7 @@ contract DecentralizedOracle is IDecentralizedOracle, Oracle {
     /// @param _numOfResults The number of result options.
     /// @param _lastResultIndex The last result index set by the DecentralizedOracle.
     /// @param _arbitrationEndTime The unix time when the voting period ends.
-    /// @param _consensusThreshold The BOT amount that needs to be reached for this DecentralizedOracle to be valid.
+    /// @param _consensusThreshold The amount that needs to be reached for this DecentralizedOracle to be valid.
     constructor(
         uint16 _version,
         address _owner,
@@ -71,7 +71,7 @@ contract DecentralizedOracle is IDecentralizedOracle, Oracle {
         balances[_resultIndex].totalVotes = balances[_resultIndex].totalVotes.add(_amount);
         balances[_resultIndex].votes[_voter] = balances[_resultIndex].votes[_voter].add(_amount);
 
-        emit OracleResultVoted(version, address(this), _voter, _resultIndex, _amount, BOT);
+        emit OracleResultVoted(version, address(this), _voter, _resultIndex, _amount, BOE);
 
         return (balances[_resultIndex].totalVotes >= consensusThreshold, consensusThreshold);
     }

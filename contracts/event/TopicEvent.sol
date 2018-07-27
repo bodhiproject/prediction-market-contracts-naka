@@ -16,8 +16,8 @@ contract TopicEvent is BaseContract, Ownable {
     using SafeMath for uint256;
 
     /// @notice Status types
-    ///         Betting: Bet with QTUM during this phase.
-    ///         Arbitration: Vote with BOT during this phase.
+    ///         Betting: Bet with the betting token during this phase.
+    ///         OracleVoting: Arbitrate with the arbitration token during this phase.
     ///         Collection: Winners collect their winnings during this phase.
     enum Status {
         Betting,
@@ -25,15 +25,15 @@ contract TopicEvent is BaseContract, Ownable {
         Collection
     }
 
-    // Amount of QTUM to be distributed to BOT winners
-    uint8 public constant QTUM_PERCENTAGE = 1;
+    // Percentage of loser's betting tokens to be distributed to winners who particated in arbitration
+    uint8 public constant ARBITRATION_REWARD_PERCENTAGE = 1;
 
     Status public status = Status.Betting;
     bool public escrowWithdrawn;
     bytes32[10] public eventName;
     bytes32[11] public eventResults;
-    uint256 public totalQtumValue;
-    uint256 public totalBotValue;
+    uint256 public totalBetTokens;
+    uint256 public totalArbitrationTokens;
     uint256 public escrowAmount;
     IAddressManager private addressManager;
     mapping(address => bool) public didWithdraw;
@@ -47,8 +47,8 @@ contract TopicEvent is BaseContract, Ownable {
     event WinningsWithdrawn(
         uint16 indexed _version, 
         address indexed _winner, 
-        uint256 _qtumTokenWon, 
-        uint256 _botTokenWon
+        uint256 _betTokensAmount,
+        uint256 _arbitrationTokensAmount
     );
 
     // Modifiers
@@ -67,7 +67,7 @@ contract TopicEvent is BaseContract, Ownable {
     /// @param _bettingEndTime The unix time when betting will end.
     /// @param _resultSettingStartTime The unix time when the CentralizedOracle can set the result.
     /// @param _resultSettingEndTime The unix time when anyone can set the result.
-    /// @param _escrowAmount The amount of BOT deposited to create the Event.
+    /// @param _escrowAmount Arbitration tokens amount deposited to create the Event.
     /// @param _addressManager The address of the AddressManager.
     constructor(
         uint16 _version,
@@ -130,7 +130,7 @@ contract TopicEvent is BaseContract, Ownable {
         // Update balances
         balances[_resultIndex].totalBets = balances[_resultIndex].totalBets.add(msg.value);
         balances[_resultIndex].bets[msg.sender] = balances[_resultIndex].bets[msg.sender].add(msg.value);
-        totalQtumValue = totalQtumValue.add(msg.value);
+        totalBetTokens = totalBetTokens.add(msg.value);
 
         ICentralizedOracle(_centralizedOracle).recordBet(msg.sender, _resultIndex, msg.value);
     }
@@ -161,7 +161,7 @@ contract TopicEvent is BaseContract, Ownable {
         balances[_resultIndex].totalVotes = balances[_resultIndex].totalVotes.add(_consensusThreshold);
         balances[_resultIndex].votes[_resultSetter] = balances[_resultIndex].votes[_resultSetter]
             .add(_consensusThreshold);
-        totalBotValue = totalBotValue.add(_consensusThreshold);
+        totalArbitrationTokens = totalArbitrationTokens.add(_consensusThreshold);
 
         ICentralizedOracle(_centralizedOracle).recordSetResult(_resultSetter, _resultIndex, _consensusThreshold);
 
@@ -182,7 +182,7 @@ contract TopicEvent is BaseContract, Ownable {
         // Update balances
         balances[_resultIndex].totalVotes = balances[_resultIndex].totalVotes.add(_amount);
         balances[_resultIndex].votes[_voter] = balances[_resultIndex].votes[_voter].add(_amount);
-        totalBotValue = totalBotValue.add(_amount);
+        totalArbitrationTokens = totalArbitrationTokens.add(_amount);
 
         // Set result and deploy new DecentralizedOracle if threshold hit
         bool didHitThreshold;
@@ -217,18 +217,18 @@ contract TopicEvent is BaseContract, Ownable {
 
         didWithdraw[msg.sender] = true;
 
-        uint256 botWon;
-        uint256 qtumWon;
-        (botWon, qtumWon) = calculateWinnings();
+        uint256 arbitrationTokenAmount;
+        uint256 betTokenAmount;
+        (arbitrationTokenAmount, betTokenAmount) = calculateWinnings();
 
-        if (qtumWon > 0) {
-            msg.sender.transfer(qtumWon);
+        if (betTokenAmount > 0) {
+            msg.sender.transfer(betTokenAmount);
         }
-        if (botWon > 0) {
-            ERC20(addressManager.bodhiTokenAddress()).transfer(msg.sender, botWon);
+        if (arbitrationTokenAmount > 0) {
+            ERC20(addressManager.bodhiTokenAddress()).transfer(msg.sender, arbitrationTokenAmount);
         }
 
-        emit WinningsWithdrawn(version, msg.sender, qtumWon, botWon);
+        emit WinningsWithdrawn(version, msg.sender, betTokenAmount, arbitrationTokenAmount);
     }
 
     /// @notice Allows the creator of the Event to withdraw the escrow amount.
@@ -246,32 +246,37 @@ contract TopicEvent is BaseContract, Ownable {
         return (resultIndex, status == Status.Collection);
     }
 
-    /// @notice Calculates the BOT and QTUM tokens won based on the sender's contributions.
-    /// @return The amount of BOT and QTUM tokens won.
-    function calculateWinnings() public view inCollectionStatus() returns (uint256, uint256) {
+    /// @notice Calculates the tokens returned based on the sender's participation.
+    /// @return The amount of arbitration tokens and bet tokens won.
+    function calculateWinnings()
+        public
+        view
+        inCollectionStatus()
+        returns (uint256 arbitrationTokens, uint256 betTokens)
+    {
         uint256 votes = balances[resultIndex].votes[msg.sender];
         uint256 bets = balances[resultIndex].bets[msg.sender];
 
-        // Calculate Qtum reward total
+        // Calculate bet token reward
         uint256 losersTotal = 0;
         for (uint8 i = 0; i < numOfResults; i++) {
             if (i != resultIndex) {
                 losersTotal = losersTotal.add(balances[i].totalBets);
             }
         }
-        uint256 rewardQtum = uint256(QTUM_PERCENTAGE).mul(losersTotal).div(100);
-        losersTotal = losersTotal.sub(rewardQtum);
+        uint256 betTokenReward = uint256(ARBITRATION_REWARD_PERCENTAGE).mul(losersTotal).div(100);
+        losersTotal = losersTotal.sub(betTokenReward);
 
-        // Calculate QTUM winnings
+        // Calculate bet token return
         uint256 winnersTotal;
-        uint256 qtumWon = 0;
+        uint256 betTokenReturn = 0;
         if (bets > 0) {
             winnersTotal = balances[resultIndex].totalBets;
-            qtumWon = bets.mul(losersTotal).div(winnersTotal).add(bets);
+            betTokenReturn = bets.mul(losersTotal).div(winnersTotal).add(bets);
         }
 
-        // Calculate BOT winnings
-        uint256 botWon = 0;
+        // Calculate arbitration token return
+        uint256 arbitrationTokenReturn = 0;
         if (votes > 0) {
             winnersTotal = balances[resultIndex].totalVotes;
             losersTotal = 0;
@@ -280,12 +285,14 @@ contract TopicEvent is BaseContract, Ownable {
                     losersTotal = losersTotal.add(balances[i].totalVotes);
                 }
             }
-            botWon = votes.mul(losersTotal).div(winnersTotal).add(votes);
-            uint256 rewardWon = votes.mul(rewardQtum).div(winnersTotal);
-            qtumWon = qtumWon.add(rewardWon);
+            arbitrationTokenReturn = votes.mul(losersTotal).div(winnersTotal).add(votes);
+
+            // Add the bet token reward from arbitration to the betTokenReturn
+            uint256 rewardWon = votes.mul(betTokenReward).div(winnersTotal);
+            betTokenReturn = betTokenReturn.add(rewardWon);
         }
 
-        return (botWon, qtumWon);
+        return (arbitrationTokenReturn, betTokenReturn);
     }
 
     function createCentralizedOracle(

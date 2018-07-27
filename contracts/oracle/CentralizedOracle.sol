@@ -20,7 +20,7 @@ contract CentralizedOracle is ICentralizedOracle, Oracle {
     /// @param _bettingEndTime The unix time when betting will end.
     /// @param _resultSettingStartTime The unix time when the CentralizedOracle can set the result.
     /// @param _resultSettingEndTime The unix time when anyone can set the result.
-    /// @param _consensusThreshold The BOT amount that needs to be paid by the Oracle for their result to be valid.
+    /// @param _consensusThreshold The amount that needs to be paid by the Oracle for their result to be valid.
     constructor(
         uint16 _version,
         address _owner,
@@ -81,7 +81,7 @@ contract CentralizedOracle is ICentralizedOracle, Oracle {
         balances[_resultIndex].totalBets = balances[_resultIndex].totalBets.add(_amount);
         balances[_resultIndex].bets[_bettor] = balances[_resultIndex].bets[_bettor].add(_amount);
 
-        emit OracleResultVoted(version, address(this), _bettor, _resultIndex, _amount, QTUM);
+        emit OracleResultVoted(version, address(this), _bettor, _resultIndex, _amount, ETH);
     }
 
     /// @dev Validate a set result. Must be called from TopicEvent.
@@ -118,7 +118,7 @@ contract CentralizedOracle is ICentralizedOracle, Oracle {
         balances[_resultIndex].totalVotes = balances[_resultIndex].totalVotes.add(_amount);
         balances[_resultIndex].votes[_resultSetter] = balances[_resultIndex].votes[_resultSetter].add(_amount);
 
-        emit OracleResultVoted(version, address(this), _resultSetter, _resultIndex, _amount, BOT);
+        emit OracleResultVoted(version, address(this), _resultSetter, _resultIndex, _amount, BOE);
         emit OracleResultSet(version, address(this), _resultIndex);
     }
 }
