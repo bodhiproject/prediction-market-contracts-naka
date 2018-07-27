@@ -5,7 +5,7 @@ import "../storage/IAddressManager.sol";
 import "../oracle/IOracleFactory.sol";
 import "../oracle/ICentralizedOracle.sol";
 import "../oracle/IDecentralizedOracle.sol";
-import "../token/ERC20.sol";
+import "../token/ERC223.sol";
 import "../token/ERC223ReceivingContract.sol";
 import "../lib/Ownable.sol";
 import "../lib/SafeMath.sol";
@@ -120,7 +120,7 @@ contract TopicEvent is BaseContract, Ownable {
         // TODO: handle vote call
     }
 
-    /// @dev Places a bet.
+    /// @notice Places a bet.
     /// @param _centralizedOracle Address of the CentralizedOracle.
     /// @param _resultIndex Index of result to bet on.
     function bet(address _centralizedOracle, uint8 _resultIndex) external payable {
@@ -194,7 +194,7 @@ contract TopicEvent is BaseContract, Ownable {
         }
     }
 
-    /// @dev Finalizes the current result.
+    /// @notice Finalizes the current result.
     /// @param _decentralizedOracle Address of the DecentralizedOracle contract.
     function finalizeResult(address _decentralizedOracle) external {
         require(status == Status.OracleVoting);
@@ -225,7 +225,7 @@ contract TopicEvent is BaseContract, Ownable {
             msg.sender.transfer(betTokenAmount);
         }
         if (arbitrationTokenAmount > 0) {
-            ERC20(addressManager.bodhiTokenAddress()).transfer(msg.sender, arbitrationTokenAmount);
+            ERC223(addressManager.bodhiTokenAddress()).transfer(msg.sender, arbitrationTokenAmount);
         }
 
         emit WinningsWithdrawn(version, msg.sender, betTokenAmount, arbitrationTokenAmount);
@@ -241,7 +241,7 @@ contract TopicEvent is BaseContract, Ownable {
     }
 
     /// @notice Gets the final result index and flag indicating if the result is final.
-    /// @return The result index and finalized bool.
+    /// @return Result index and if it is the final result.
     function getFinalResult() public view returns (uint8, bool) {
         return (resultIndex, status == Status.Collection);
     }
