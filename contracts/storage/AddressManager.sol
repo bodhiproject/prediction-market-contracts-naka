@@ -138,7 +138,7 @@ contract AddressManager is IAddressManager, Ownable {
     }
 
     /// @dev Sets the thresholdPercentIncrease that DecentralizedOracles will use.
-    /// @param _newIncrement The new increment amount for DecentralizedOracles.
+    /// @param _newPercentage The new increment amount for DecentralizedOracles.
     function setConsensusThresholdPercentIncrease(uint256 _newPercentage) public onlyOwner() {   
         thresholdPercentIncrease = _newPercentage;
     }

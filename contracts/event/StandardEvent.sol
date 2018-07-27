@@ -62,19 +62,18 @@ contract StandardEvent is BaseContract, Ownable {
     /// @notice Creates new StandardEvent contract.
     /// @param _version The contract version.
     /// @param _owner The address of the owner.
-    /// @param _centralizedOracle The address of the CentralizedOracle that will decide the result.
+    /// @param _resultSetter The address of the CentralizedOracle that will decide the result.
     /// @param _name The question or statement prediction broken down by multiple bytes32.
     /// @param _resultNames The possible results.
     /// @param _bettingStartTime The unix time when betting will start.
     /// @param _bettingEndTime The unix time when betting will end.
     /// @param _resultSettingStartTime The unix time when the CentralizedOracle can set the result.
     /// @param _resultSettingEndTime The unix time when anyone can set the result.
-    /// @param _escrowAmount Arbitration tokens amount deposited to create the Event.
     /// @param _addressManager The address of the AddressManager.
     constructor(
         uint16 _version,
         address _owner,
-        address _centralizedOracle,
+        address _resultSetter,
         bytes32[10] _name,
         bytes32[11] _resultNames,
         uint8 _numOfResults,
@@ -85,7 +84,7 @@ contract StandardEvent is BaseContract, Ownable {
         address _addressManager)
         Ownable(_owner)
         public
-        validAddress(_centralizedOracle)
+        validAddress(_resultSetter)
         validAddress(_addressManager)
     {
         require(!_name[0].isEmpty());
@@ -104,7 +103,7 @@ contract StandardEvent is BaseContract, Ownable {
         escrowAmount = addressManager.eventEscrowAmount();
 
         createCentralizedOracle(
-            _centralizedOracle, _bettingStartTime, _bettingEndTime, _resultSettingStartTime, _resultSettingEndTime
+            _resultSetter, _bettingStartTime, _bettingEndTime, _resultSettingStartTime, _resultSettingEndTime
         );
     }
 
@@ -124,8 +123,8 @@ contract StandardEvent is BaseContract, Ownable {
 
         address centralizedOracle = _data.toAddress(4);
         address resultSetter = _data.toAddress(24);
-        uint8 resultIndex = _data.toUint(44);
-        uint256 amount = data.toUint(64);
+        uint8 resultIndex = uint8(_data.toUint(44));
+        uint256 amount = _data.toUint(64);
 
         if (functionId.equal(setResultFunc)) {
             setResult(centralizedOracle, resultSetter, resultIndex, amount);
