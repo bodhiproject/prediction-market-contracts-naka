@@ -65,7 +65,8 @@ contract EventFactory {
         // Event should not exist yet
         require(address(events[eventHash]) == 0);
 
-        IAddressManager(addressManager).transferEscrow(msg.sender);
+        // TODO: create EscrowBank contract to handle escrows with ERC223
+        // IAddressManager(addressManager).transferEscrow(msg.sender);
 
         StandardEvent standardEvent = new StandardEvent(version, msg.sender, _oracle, _name, resultNames, numOfResults, 
             _bettingStartTime, _bettingEndTime, _resultSettingStartTime, _resultSettingEndTime, addressManager);
