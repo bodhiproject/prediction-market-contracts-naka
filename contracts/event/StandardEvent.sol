@@ -10,8 +10,10 @@ import "../token/ERC223ReceivingContract.sol";
 import "../lib/Ownable.sol";
 import "../lib/SafeMath.sol";
 import "../lib/ByteUtils.sol";
+import "bytes/BytesLib.sol";
 
 contract StandardEvent is BaseContract, Ownable {
+    using BytesLib for bytes;
     using ByteUtils for bytes32;
     using SafeMath for uint256;
 
@@ -116,8 +118,22 @@ contract StandardEvent is BaseContract, Ownable {
     /// @param _value Amount of tokens.
     /// @param _data Transaction metadata.
     function tokenFallback(address _from, uint _value, bytes _data) external {
-        // TODO: handle setResult call
-        // TODO: handle vote call
+        bytes memory functionId = _data.slice(0, 4);
+        bytes memory setResultFunc = hex"65f4ced1";
+        bytes memory voteFunc = hex"6f02d1fb";
+
+        address centralizedOracle = _data.toAddress(4);
+        address resultSetter = _data.toAddress(24);
+        uint8 resultIndex = _data.toUint(44);
+        uint256 amount = data.toUint(64);
+
+        if (functionId.equal(setResultFunc)) {
+            setResult(centralizedOracle, resultSetter, resultIndex, amount);
+        } else if (functionId.equal(voteFunc)) {
+            vote(centralizedOracle, resultSetter, resultIndex, amount);
+        } else {
+            revert("Unhandled function in tokenFallback");
+        }
     }
 
     /// @notice Places a bet.
@@ -133,65 +149,6 @@ contract StandardEvent is BaseContract, Ownable {
         totalBetTokens = totalBetTokens.add(msg.value);
 
         ICentralizedOracle(_centralizedOracle).recordBet(msg.sender, _resultIndex, msg.value);
-    }
-
-    /// @dev Set the result as the result setter. tokenFallback should be calling this.
-    /// @param _centralizedOracle Address of the CentralizedOracle contract.
-    /// @param _resultSetter Entity who is setting the result.
-    /// @param _resultIndex Index of the result to set.
-    /// @param _consensusThreshold Threshold that the result setter is voting to validate the result.
-    function setResult(
-        address _centralizedOracle,
-        address _resultSetter,
-        uint8 _resultIndex,
-        uint256 _consensusThreshold)
-        external
-    {
-        require(status == Status.Betting);
-
-        bool isValid = ICentralizedOracle(_centralizedOracle)
-            .validateSetResult(_resultSetter, _resultIndex, _consensusThreshold);
-        assert(isValid);
-
-        // Update statuses and current result
-        status = Status.OracleVoting;
-        resultIndex = _resultIndex;
-
-        // Update balances
-        balances[_resultIndex].totalVotes = balances[_resultIndex].totalVotes.add(_consensusThreshold);
-        balances[_resultIndex].votes[_resultSetter] = balances[_resultIndex].votes[_resultSetter]
-            .add(_consensusThreshold);
-        totalArbitrationTokens = totalArbitrationTokens.add(_consensusThreshold);
-
-        ICentralizedOracle(_centralizedOracle).recordSetResult(_resultSetter, _resultIndex, _consensusThreshold);
-
-        // Deploy DecentralizedOracle
-        uint256 increment = addressManager.thresholdPercentIncrease().mul(_consensusThreshold).div(100);
-        createDecentralizedOracle(_consensusThreshold.add(increment));
-    }
-
-    /// @dev Vote against the current result. tokenFallback should be calling this.
-    /// @param _decentralizedOracle Address of the DecentralizedOracle contract.
-    /// @param _voter Entity who is voting.
-    /// @param _resultIndex Index of result to vote.
-    /// @param _amount Amount of tokens used to vote.
-    function vote(address _decentralizedOracle, address _voter, uint8 _resultIndex, uint256 _amount) external {
-        bool isValid = IDecentralizedOracle(_decentralizedOracle).validateVote(_voter, _resultIndex, _amount);
-        assert(isValid);
-
-        // Update balances
-        balances[_resultIndex].totalVotes = balances[_resultIndex].totalVotes.add(_amount);
-        balances[_resultIndex].votes[_voter] = balances[_resultIndex].votes[_voter].add(_amount);
-        totalArbitrationTokens = totalArbitrationTokens.add(_amount);
-
-        // Set result and deploy new DecentralizedOracle if threshold hit
-        bool didHitThreshold;
-        uint256 currentThreshold;
-        (didHitThreshold, currentThreshold) = IDecentralizedOracle(_decentralizedOracle)
-            .recordVote(_voter, _resultIndex, _amount);
-        if (didHitThreshold) {
-            decentralizedOracleSetResult(_decentralizedOracle, _resultIndex, currentThreshold);
-        }
     }
 
     /// @notice Finalizes the current result.
@@ -316,6 +273,65 @@ contract StandardEvent is BaseContract, Ownable {
         address newOracle = IOracleFactory(oracleFactory).createDecentralizedOracle(address(this), numOfResults, 
             resultIndex, block.timestamp.add(arbitrationLength), _consensusThreshold);
         assert(newOracle != address(0));
+    }
+
+    /// @dev Set the result as the result setter. tokenFallback should be calling this.
+    /// @param _centralizedOracle Address of the CentralizedOracle contract.
+    /// @param _resultSetter Entity who is setting the result.
+    /// @param _resultIndex Index of the result to set.
+    /// @param _consensusThreshold Threshold that the result setter is voting to validate the result.
+    function setResult(
+        address _centralizedOracle,
+        address _resultSetter,
+        uint8 _resultIndex,
+        uint256 _consensusThreshold)
+        private
+    {
+        require(status == Status.Betting);
+
+        bool isValid = ICentralizedOracle(_centralizedOracle)
+            .validateSetResult(_resultSetter, _resultIndex, _consensusThreshold);
+        assert(isValid);
+
+        // Update statuses and current result
+        status = Status.OracleVoting;
+        resultIndex = _resultIndex;
+
+        // Update balances
+        balances[_resultIndex].totalVotes = balances[_resultIndex].totalVotes.add(_consensusThreshold);
+        balances[_resultIndex].votes[_resultSetter] = balances[_resultIndex].votes[_resultSetter]
+            .add(_consensusThreshold);
+        totalArbitrationTokens = totalArbitrationTokens.add(_consensusThreshold);
+
+        ICentralizedOracle(_centralizedOracle).recordSetResult(_resultSetter, _resultIndex, _consensusThreshold);
+
+        // Deploy DecentralizedOracle
+        uint256 increment = addressManager.thresholdPercentIncrease().mul(_consensusThreshold).div(100);
+        createDecentralizedOracle(_consensusThreshold.add(increment));
+    }
+
+    /// @dev Vote against the current result. tokenFallback should be calling this.
+    /// @param _decentralizedOracle Address of the DecentralizedOracle contract.
+    /// @param _voter Entity who is voting.
+    /// @param _resultIndex Index of result to vote.
+    /// @param _amount Amount of tokens used to vote.
+    function vote(address _decentralizedOracle, address _voter, uint8 _resultIndex, uint256 _amount) private {
+        bool isValid = IDecentralizedOracle(_decentralizedOracle).validateVote(_voter, _resultIndex, _amount);
+        assert(isValid);
+
+        // Update balances
+        balances[_resultIndex].totalVotes = balances[_resultIndex].totalVotes.add(_amount);
+        balances[_resultIndex].votes[_voter] = balances[_resultIndex].votes[_voter].add(_amount);
+        totalArbitrationTokens = totalArbitrationTokens.add(_amount);
+
+        // Set result and deploy new DecentralizedOracle if threshold hit
+        bool didHitThreshold;
+        uint256 currentThreshold;
+        (didHitThreshold, currentThreshold) = IDecentralizedOracle(_decentralizedOracle)
+            .recordVote(_voter, _resultIndex, _amount);
+        if (didHitThreshold) {
+            decentralizedOracleSetResult(_decentralizedOracle, _resultIndex, currentThreshold);
+        }
     }
 
     /// @dev Sets the result of the DecentralizedOracle and creates a new one.
