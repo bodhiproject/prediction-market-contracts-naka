@@ -211,7 +211,7 @@ contract TopicEvent is BaseContract, Ownable {
         emit FinalResultSet(version, address(this), lastResultIndex);
     }
 
-    /// @notice Allows winners of the Event to withdraw their QTUM and BOT winnings after the final result is set.
+    /// @notice Allows winners of the Event to withdraw their winnings after the final result is set.
     function withdrawWinnings() external inCollectionStatus() {
         require(!didWithdraw[msg.sender]);
 

@@ -43,6 +43,7 @@ contract DecentralizedOracle is IDecentralizedOracle, Oracle {
     /// @param _voter Entity who is voting.
     /// @param _resultIndex Index of result to vote.
     /// @param _amount Amount of tokens used to vote.
+    /// @return Is validated.
     function validateVote(address _voter, uint8 _resultIndex, uint256 _amount)
         external
         isEventCaller(msg.sender)
@@ -61,6 +62,7 @@ contract DecentralizedOracle is IDecentralizedOracle, Oracle {
     /// @param _voter Entity who is voting.
     /// @param _resultIndex Index of result to vote.
     /// @param _amount Amount of tokens used to vote.
+    /// @return If threshold was hit and the current consensus threshold.
     function recordVote(address _voter, uint8 _resultIndex, uint256 _amount)
         external
         isEventCaller(msg.sender)

@@ -54,15 +54,11 @@ contract CentralizedOracle is ICentralizedOracle, Oracle {
         consensusThreshold = _consensusThreshold;
     }
 
-    /// @notice Fallback function that rejects any amount sent to the contract.
-    function() external payable {
-        revert();
-    }
-
     /// @dev Validate a bet. Must be called from TopicEvent.
     /// @param _bettor The entity who is placing the bet.
     /// @param _resultIndex The index of result to bet on.
     /// @param _amount The amount of the bet.
+    /// @return Is validated.
     function validateBet(address _bettor, uint8 _resultIndex, uint256 _amount)
         external
         isEventCaller(msg.sender)
@@ -92,6 +88,7 @@ contract CentralizedOracle is ICentralizedOracle, Oracle {
     /// @param _resultSetter Entity who is setting the result.
     /// @param _resultIndex Index of result to set.
     /// @param _amount Amount of tokens used to set the result.
+    /// @return Is validated.
     function validateSetResult(address _resultSetter, uint8 _resultIndex, uint256 _amount)
         external
         isEventCaller(msg.sender)
