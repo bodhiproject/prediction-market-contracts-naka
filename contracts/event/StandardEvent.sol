@@ -124,12 +124,11 @@ contract StandardEvent is BaseContract, Ownable {
         address centralizedOracle = _data.toAddress(4);
         address resultSetter = _data.toAddress(24);
         uint8 resultIndex = uint8(_data.toUint(44));
-        uint256 amount = _data.toUint(64);
 
         if (functionId.equal(setResultFunc)) {
-            setResult(centralizedOracle, resultSetter, resultIndex, amount);
+            setResult(centralizedOracle, resultSetter, resultIndex, _value);
         } else if (functionId.equal(voteFunc)) {
-            vote(centralizedOracle, resultSetter, resultIndex, amount);
+            vote(centralizedOracle, resultSetter, resultIndex, _value);
         } else {
             revert("Unhandled function in tokenFallback");
         }
