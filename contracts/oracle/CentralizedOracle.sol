@@ -1,8 +1,9 @@
 pragma solidity ^0.4.24;
 
+import "./ICentralizedOracle.sol";
 import "./Oracle.sol";
 
-contract CentralizedOracle is Oracle {
+contract CentralizedOracle is ICentralizedOracle, Oracle {
     address public oracle;
     uint256 public bettingStartTime;
     uint256 public bettingEndTime;
@@ -64,7 +65,7 @@ contract CentralizedOracle is Oracle {
     /// @param _amount The amount of the bet.
     function validateBet(address _bettor, uint8 _resultIndex, uint256 _amount)
         external
-        isAuthorized(msg.sender)
+        isEventCaller(msg.sender)
         validAddress(_bettor)
         validResultIndex(_resultIndex)
         isNotFinished()
@@ -80,7 +81,7 @@ contract CentralizedOracle is Oracle {
     /// @param _bettor The entity who is placing the bet.
     /// @param _resultIndex The index of result to bet on.
     /// @param _amount The amount of the bet.
-    function recordBet(address _bettor, uint8 _resultIndex, uint256 _amount) external isAuthorized(msg.sender) {
+    function recordBet(address _bettor, uint8 _resultIndex, uint256 _amount) external isEventCaller(msg.sender) {
         balances[_resultIndex].totalBets = balances[_resultIndex].totalBets.add(_amount);
         balances[_resultIndex].bets[_bettor] = balances[_resultIndex].bets[_bettor].add(_amount);
 
@@ -93,7 +94,7 @@ contract CentralizedOracle is Oracle {
     /// @param _amount Amount of tokens used to set the result.
     function validateSetResult(address _resultSetter, uint8 _resultIndex, uint256 _amount)
         external
-        isAuthorized(msg.sender)
+        isEventCaller(msg.sender)
         validAddress(_resultSetter)
         validResultIndex(_resultIndex)
         isNotFinished()
@@ -107,13 +108,13 @@ contract CentralizedOracle is Oracle {
         return true;
     }
 
-    /// @dev Records the setResult. Must be called from TopicEvent.
+    /// @dev Records the result. Must be called from TopicEvent.
     /// @param _resultSetter Entity who is setting the result.
     /// @param _resultIndex The index of the result to set.
     /// @param _amount Amount of tokens used to set the result.
     function recordSetResult(address _resultSetter, uint8 _resultIndex, uint256 _amount)
         external
-        isAuthorized(msg.sender)
+        isEventCaller(msg.sender)
     {
         finished = true;
         resultIndex = _resultIndex;

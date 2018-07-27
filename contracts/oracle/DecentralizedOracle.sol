@@ -1,8 +1,9 @@
 pragma solidity ^0.4.24;
 
+import "./IDecentralizedOracle.sol";
 import "./Oracle.sol";
 
-contract DecentralizedOracle is Oracle {
+contract DecentralizedOracle is IDecentralizedOracle, Oracle {
     uint8 public lastResultIndex;
     uint256 public arbitrationEndTime;
 
@@ -38,34 +39,48 @@ contract DecentralizedOracle is Oracle {
         consensusThreshold = _consensusThreshold;
     }
 
-    /// @notice Vote on an Event result which requires BOT payment.
-    /// @param _eventResultIndex The Event result which is being voted on.
-    /// @param _botAmount The amount of BOT used to vote.
-    function voteResult(uint8 _eventResultIndex, uint256 _botAmount) 
-        external 
-        validResultIndex(_eventResultIndex) 
+    /// @dev Validate a vote. Must be called from TopicEvent.
+    /// @param _voter Entity who is voting.
+    /// @param _resultIndex Index of result to vote.
+    /// @param _amount Amount of tokens used to vote.
+    function validateVote(address _voter, uint8 _resultIndex, uint256 _amount)
+        external
+        isEventCaller(msg.sender)
+        validAddress(_voter)
+        validResultIndex(_resultIndex)
         isNotFinished()
+        returns (bool isValid)
     {
-        require(_botAmount > 0);
         require(block.timestamp < arbitrationEndTime);
-        require(_eventResultIndex != lastResultIndex);
+        require(_resultIndex != lastResultIndex);
+        require(_amount > 0);
+        return true;
+    }
 
-        // Only accept the vote amount up to the consensus threshold
-        uint256 adjustedVoteAmount = _botAmount;
-        if (balances[_eventResultIndex].totalVotes.add(_botAmount) > consensusThreshold) {
-            adjustedVoteAmount = consensusThreshold.sub(balances[_eventResultIndex].totalVotes);
-        }
+    /// @dev Records the vote. Must be called from TopicEvent.
+    /// @param _voter Entity who is voting.
+    /// @param _resultIndex Index of result to vote.
+    /// @param _amount Amount of tokens used to vote.
+    function recordVote(address _voter, uint8 _resultIndex, uint256 _amount)
+        external
+        isEventCaller(msg.sender)
+        returns (bool didHitThreshold, uint256 currentThreshold)
+    {
+        balances[_resultIndex].totalVotes = balances[_resultIndex].totalVotes.add(_amount);
+        balances[_resultIndex].votes[_voter] = balances[_resultIndex].votes[_voter].add(_amount);
 
-        balances[_eventResultIndex].totalVotes = balances[_eventResultIndex].totalVotes.add(adjustedVoteAmount);
-        balances[_eventResultIndex].votes[msg.sender] = balances[_eventResultIndex].votes[msg.sender]
-            .add(adjustedVoteAmount);
+        emit OracleResultVoted(version, address(this), _voter, _resultIndex, _amount, BOT);
 
-        ITopicEvent(eventAddress).voteFromOracle(_eventResultIndex, msg.sender, adjustedVoteAmount);
-        emit OracleResultVoted(version, address(this), msg.sender, _eventResultIndex, adjustedVoteAmount, BOT);
+        return (balances[_resultIndex].totalVotes >= consensusThreshold, consensusThreshold);
+    }
 
-        if (balances[_eventResultIndex].totalVotes >= consensusThreshold) {
-            setResult();
-        }
+    /// @dev Records the result. Votes on a result hit the consensusThreshold. Must be called from TopicEvent.
+    /// @param _resultIndex Index of the result to set.
+    function recordSetResult(uint8 _resultIndex) external isEventCaller(msg.sender) {
+        finished = true;
+        resultIndex = _resultIndex;
+
+        emit OracleResultSet(version, address(this), _resultIndex);
     }
 
     /// @notice This can be called by anyone if this VotingOracle did not meet the consensus threshold and has reached 
@@ -79,22 +94,5 @@ contract DecentralizedOracle is Oracle {
         resultIndex = lastResultIndex;
 
         ITopicEvent(eventAddress).decentralizedOracleFinalizeResult();
-    }
-
-    /// @dev DecentralizedOracle is validated and set the result of the Event.
-    function setResult() private {
-        finished = true;
-
-        uint256 winningVoteBalance = 0;
-        for (uint8 i = 0; i < numOfResults; i++) {
-            uint256 totalVoteBalance = balances[i].totalVotes;
-            if (totalVoteBalance > winningVoteBalance) {
-                winningVoteBalance = totalVoteBalance;
-                resultIndex = i;
-            }
-        }
-
-        ITopicEvent(eventAddress).decentralizedOracleSetResult(resultIndex, winningVoteBalance);
-        emit OracleResultSet(version, address(this), resultIndex);
     }
 }

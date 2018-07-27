@@ -36,7 +36,7 @@ contract Oracle is BaseContract, Ownable {
         _;
     }
 
-    modifier isAuthorized(address _callerAddress) {
+    modifier isEventCaller(address _callerAddress) {
         require(_callerAddress == eventAddress);
         _;
     }

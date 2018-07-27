@@ -1,17 +1,17 @@
 pragma solidity ^0.4.24;
 
-import "./ITopicEvent.sol";
 import "../BaseContract.sol";
 import "../storage/IAddressManager.sol";
 import "../oracle/IOracleFactory.sol";
 import "../oracle/ICentralizedOracle.sol";
+import "../oracle/IDecentralizedOracle.sol";
 import "../token/ERC20.sol";
 import "../token/ERC223ReceivingContract.sol";
 import "../lib/Ownable.sol";
 import "../lib/SafeMath.sol";
 import "../lib/ByteUtils.sol";
 
-contract TopicEvent is ITopicEvent, BaseContract, Ownable {
+contract TopicEvent is BaseContract, Ownable {
     using ByteUtils for bytes32;
     using SafeMath for uint256;
 
@@ -58,11 +58,6 @@ contract TopicEvent is ITopicEvent, BaseContract, Ownable {
     );
 
     // Modifiers
-    modifier fromCentralizedOracle() {
-        require(msg.sender == oracles[0].oracleAddress);
-        _;
-    }
-
     modifier inCollectionStatus() {
         require(status == Status.Collection);
         _;
@@ -138,6 +133,7 @@ contract TopicEvent is ITopicEvent, BaseContract, Ownable {
         bool isValid = ICentralizedOracle(_centralizedOracle).validateBet(msg.sender, _resultIndex, msg.value);
         assert(isValid);
 
+        // Update balances
         balances[_resultIndex].totalBets = balances[_resultIndex].totalBets.add(msg.value);
         balances[_resultIndex].bets[msg.sender] = balances[_resultIndex].bets[msg.sender].add(msg.value);
         totalQtumValue = totalQtumValue.add(msg.value);
@@ -175,67 +171,35 @@ contract TopicEvent is ITopicEvent, BaseContract, Ownable {
             .add(_consensusThreshold);
         totalBotValue = totalBotValue.add(_consensusThreshold);
 
+        ICentralizedOracle(_centralizedOracle).recordSetResult(_resultSetter, _resultIndex, _consensusThreshold);
+
         // Deploy DecentralizedOracle
         uint256 increment = addressManager.thresholdPercentIncrease().mul(_consensusThreshold).div(100);
         createDecentralizedOracle(_consensusThreshold.add(increment));
     }
 
-    /// @dev DecentralizedOracle contract can call this method to vote for a user. Voter must BOT approve() with the 
-    ///      amount to TopicEvent address before voting.
-    /// @param _resultIndex The index of result to vote on.
-    /// @param _sender The address of the person voting on a result.
-    /// @param _amount The BOT amount used to vote.
-    /// @return Flag indicating a successful transfer.
-    function voteFromOracle(uint8 _resultIndex, address _sender, uint256 _amount)
-        external
-        validResultIndex(_resultIndex)
-        returns (bool)
-    {
-        bool isValidOracle = false;
-        for (uint8 i = 1; i < oracles.length; i++) {
-            if (msg.sender == oracles[i].oracleAddress) {
-                isValidOracle = true;
-                break;
-            }
-        }
-        require(isValidOracle);
-        require(_amount > 0);
+    /// @dev Vote against the current result. tokenFallback should be calling this.
+    /// @param _decentralizedOracle Address of the DecentralizedOracle contract.
+    /// @param _voter Entity who is voting.
+    /// @param _resultIndex Index of result to vote.
+    /// @param _amount Amount of tokens used to vote.
+    function vote(address _decentralizedOracle, address _voter, uint8 _resultIndex, uint256 _amount) external {
+        bool isValid = IDecentralizedOracle(_decentralizedOracle).validateVote(_voter, _resultIndex, _amount);
+        assert(isValid);
 
-        ERC20 token = ERC20(addressManager.bodhiTokenAddress());
-        require(token.allowance(_sender, address(this)) >= _amount);
-
+        // Update balances
         balances[_resultIndex].totalVotes = balances[_resultIndex].totalVotes.add(_amount);
-        balances[_resultIndex].votes[_sender] = balances[_resultIndex].votes[_sender].add(_amount);
+        balances[_resultIndex].votes[_voter] = balances[_resultIndex].votes[_voter].add(_amount);
         totalBotValue = totalBotValue.add(_amount);
 
-        return token.transferFrom(_sender, address(this), _amount);
-    }
-
-    /// @dev DecentralizedOracle contract can call this to set the result after vote passes consensus threshold.
-    /// @param _resultIndex The index of the result to set.
-    /// @param _currentConsensusThreshold The current consensus threshold for the Oracle.
-    function decentralizedOracleSetResult(uint8 _resultIndex, uint256 _currentConsensusThreshold)
-        external 
-        validResultIndex(_resultIndex)
-        returns (bool)
-    {
-        bool isValidOracle = false;
-        uint8 oracleIndex;
-        for (uint8 i = 1; i < oracles.length; i++) {
-            if (msg.sender == oracles[i].oracleAddress && !oracles[i].didSetResult) {
-                isValidOracle = true;
-                oracleIndex = i;
-                break;
-            }
+        // Set result and deploy new DecentralizedOracle if threshold hit
+        bool didHitThreshold;
+        uint256 currentThreshold;
+        (didHitThreshold, currentThreshold) = IDecentralizedOracle(_decentralizedOracle)
+            .recordVote(_voter, _resultIndex, _amount);
+        if (didHitThreshold) {
+            decentralizedOracleSetResult(_decentralizedOracle, _resultIndex, currentThreshold);
         }
-        require(isValidOracle);
-
-        oracles[oracleIndex].didSetResult = true;
-        status = Status.OracleVoting;
-        resultIndex = _resultIndex;
-
-        uint256 increment = addressManager.thresholdPercentIncrease().mul(_currentConsensusThreshold).div(100);
-        return createDecentralizedOracle(_currentConsensusThreshold.add(increment));
     }
 
     /// @dev The last DecentralizedOracle contract can call this method to change status to Collection.
@@ -348,7 +312,7 @@ contract TopicEvent is ITopicEvent, BaseContract, Ownable {
             }));
     }
 
-    function createDecentralizedOracle(uint256 _consensusThreshold) private returns (bool) {
+    function createDecentralizedOracle(uint256 _consensusThreshold) private {
         address oracleFactory = addressManager.oracleFactoryVersionToAddress(version);
         uint256 arbitrationLength = addressManager.arbitrationLength();
         address newOracle = IOracleFactory(oracleFactory).createDecentralizedOracle(address(this), numOfResults, 
@@ -359,7 +323,27 @@ contract TopicEvent is ITopicEvent, BaseContract, Ownable {
             oracleAddress: newOracle,
             didSetResult: false
             }));
+    }
 
-        return true;
+    /// @dev Sets the result of the DecentralizedOracle and creates a new one.
+    /// @param _decentralizedOracle Address of the DecentralizedOracle contract.
+    /// @param _resultIndex Index of the result to set.
+    /// @param _currentConsensusThreshold The current consensus threshold for the DecentralizedOracle.
+    function decentralizedOracleSetResult(
+        address _decentralizedOracle,
+        uint8 _resultIndex,
+        uint256 _currentConsensusThreshold)
+        private
+    {
+        // Update statuses
+        status = Status.OracleVoting;
+        resultIndex = _resultIndex;
+
+        // Record result in DecentralizedOracle
+        IDecentralizedOracle(_decentralizedOracle).recordSetResult(_resultIndex);
+
+        // Deploy new DecentralizedOracle
+        uint256 increment = addressManager.thresholdPercentIncrease().mul(_currentConsensusThreshold).div(100);
+        createDecentralizedOracle(_currentConsensusThreshold.add(increment));
     }
 }
