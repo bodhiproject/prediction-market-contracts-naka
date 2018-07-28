@@ -3,12 +3,15 @@
 import os
 import json
 
-for file in os.listdir("../build/contracts"):
-    if file.endswith(".json"):
-        with open(file, 'r') as f:
+dir_path = os.path.dirname('../build/contracts/')
+for file in os.listdir('../build/contracts'):
+    if file.endswith('.json'):
+        with open(os.path.join(dir_path, file), 'r') as f:
             jsonObj = json.load(f)
-            abiStr = json.dumps(jsonObj["abi"])
+            abiStr = json.dumps(jsonObj['abi'])
             abiStr = abiStr.replace('\n', '').replace('\r', '').replace(' ', '')
-            print file
-
-
+            
+            filename = file.replace('.json', '') + '.abi'
+            with open(os.path.join(dir_path, filename), 'w') as newFile:
+                print "Dumping " + filename
+                json.dump(json.loads(abiStr), newFile, sort_keys=True)
