@@ -8,10 +8,10 @@ let addressManager;
 module.exports = function(deployer) {
   deployer.deploy(AddressManager).then((instance) => addressManager = instance);
   deployer.deploy(BodhiEthereum).then(() => addressManager.setBodhiTokenAddress(BodhiEthereum.address));
-  deployer.deploy(EventFactory, addressManager.address).then(() => {
+  deployer.deploy(EventFactory, AddressManager.address).then(() => {
     addressManager.setEventFactoryAddress(EventFactory.address)
   });
-  deployer.deploy(OracleFactory, addressManager.address).then(() => {
+  deployer.deploy(OracleFactory, AddressManager.address).then(() => {
     addressManager.setOracleFactoryAddress(OracleFactory.address)
   });
 };
