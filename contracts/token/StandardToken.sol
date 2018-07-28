@@ -1,8 +1,8 @@
-pragma solidity ^0.4.23;
+pragma solidity ^0.4.24;
 
-import './ERC223.sol';
-import './ERC223ReceivingContract.sol';
-import '../lib/SafeMath.sol';
+import "./ERC223.sol";
+import "./ERC223ReceivingContract.sol";
+import "../lib/SafeMath.sol";
 
 contract StandardToken is ERC223 {
     using SafeMath for uint256;
@@ -16,22 +16,18 @@ contract StandardToken is ERC223 {
         _;
     }
 
-    /*
-    * @dev ERC20 method to transfer token to a specified address.
-    * @param _to The address to transfer to.
-    * @param _value The amount to be transferred.
-    */
+    /// @dev ERC20 method to transfer token to a specified address.
+    /// @param _to The address to transfer to.
+    /// @param _value The amount to be transferred.
     function transfer(address _to, uint256 _value) public returns (bool) {
         bytes memory empty;
         transfer(_to, _value, empty);
     }
 
-    /*
-    * @dev ERC223 method to transfer token to a specified address with data.
-    * @param _to The address to transfer to.
-    * @param _value The amount to be transferred.
-    * @param _data Transaction metadata.
-    */
+    /// @dev ERC223 method to transfer token to a specified address with data.
+    /// @param _to The address to transfer to.
+    /// @param _value The amount to be transferred.
+    /// @param _data Transaction metadata.
     function transfer(address _to, uint256 _value, bytes _data) public validAddress(_to) returns (bool success) {
         uint codeLength;
 
@@ -53,11 +49,9 @@ contract StandardToken is ERC223 {
         return true;
     }
 
-    /*
-    * @dev Approve the passed address to spend the specified amount of tokens on behalf of msg.sender.
-    * @param _spender The address which will spend the funds.
-    * @param _value The amount of tokens to be spent.
-    */
+    /// @dev Approve the passed address to spend the specified amount of tokens on behalf of msg.sender.
+    /// @param _spender The address which will spend the funds.
+    /// @param _value The amount of tokens to be spent.
     function approve(address _spender, uint256 _value) public returns (bool) {
         // To change the approve amount you first have to reduce the addresses`
         //  allowance to zero by calling `approve(_spender, 0)` if it is not
@@ -70,12 +64,10 @@ contract StandardToken is ERC223 {
         return true;
     }
 
-    /*
-    * @dev Transfer tokens from one address to another
-    * @param _from address The address which you want to send tokens from
-    * @param _to address The address which you want to transfer to
-    * @param _value uint256 the amount of tokens to be transferred
-    */
+    /// @dev Transfer tokens from one address to another
+    /// @param _from address The address which you want to send tokens from
+    /// @param _to address The address which you want to transfer to
+    /// @param _value uint256 the amount of tokens to be transferred
     function transferFrom(address _from, address _to, uint256 _value) public validAddress(_to) returns (bool) {
         uint256 _allowance = allowed[_from][msg.sender];
 
@@ -89,21 +81,17 @@ contract StandardToken is ERC223 {
         return true;
     }
 
-    /*
-    * @dev Gets the balance of the specified address.
-    * @param _owner The address to query the the balance of.
-    * @return An uint256 representing the amount owned by the passed address.
-    */
+    /// @dev Gets the balance of the specified address.
+    /// @param _owner The address to query the the balance of.
+    /// @return An uint256 representing the amount owned by the passed address.
     function balanceOf(address _owner) public view returns (uint256 balance) {
         return balances[_owner];
     }
 
-    /*
-    * @dev Function to check the amount of tokens that an owner allowed to a spender.
-    * @param _owner address The address which owns the funds.
-    * @param _spender address The address which will spend the funds.
-    * @return A uint256 specifying the amount of tokens still available for the spender.
-    */
+    /// @dev Function to check the amount of tokens that an owner allowed to a spender.
+    /// @param _owner address The address which owns the funds.
+    /// @param _spender address The address which will spend the funds.
+    /// @return A uint256 specifying the amount of tokens still available for the spender.
     function allowance(address _owner, address _spender) public view returns (uint256 remaining) {
         return allowed[_owner][_spender];
     }

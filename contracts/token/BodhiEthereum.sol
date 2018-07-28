@@ -1,6 +1,6 @@
-pragma solidity ^0.4.23;
+pragma solidity ^0.4.24;
 
-import './MintableToken.sol';
+import "./MintableToken.sol";
 
 contract BodhiEthereum is MintableToken {
     // Token configurations

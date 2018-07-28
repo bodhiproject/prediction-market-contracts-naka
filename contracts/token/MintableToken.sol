@@ -1,7 +1,7 @@
 pragma solidity ^0.4.23;
 
-import './StandardToken.sol';
-import '../lib/Ownable.sol';
+import "./StandardToken.sol";
+import "../lib/Ownable.sol";
 
 contract MintableToken is StandardToken, Ownable {
     // Events
