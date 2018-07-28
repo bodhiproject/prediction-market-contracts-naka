@@ -5,13 +5,23 @@ const OracleFactory = artifacts.require("./oracle/OracleFactory.sol");
 
 let addressManager;
 
-module.exports = function(deployer) {
-  deployer.deploy(AddressManager).then((instance) => addressManager = instance);
-  deployer.deploy(BodhiEthereum).then(() => addressManager.setBodhiTokenAddress(BodhiEthereum.address));
-  deployer.deploy(EventFactory, AddressManager.address).then(() => {
-    addressManager.setEventFactoryAddress(EventFactory.address)
-  });
-  deployer.deploy(OracleFactory, AddressManager.address).then(() => {
-    addressManager.setOracleFactoryAddress(OracleFactory.address)
+module.exports = async (deployer) => {
+  deployer.deploy(AddressManager).then((addrMgr) => {
+    addressManager = addrMgr;
+    return deployer.deploy(BodhiEthereum);
+  }).then((bodhiEth) => {
+    console.log('     addressManager.setBodhiTokenAddress:');
+    addressManager.setBodhiTokenAddress(BodhiEthereum.address);
+    return deployer.deploy(EventFactory, AddressManager.address);
+  }).then((evtFactory) => {
+    console.log('    addressManager.setEventFactoryAddress:');
+    addressManager.setEventFactoryAddress(EventFactory.address);
+    return deployer.deploy(OracleFactory, AddressManager.address);
+  }).then((orcFactory) => {
+    console.log('    addressManager.setOracleFactoryAddress:');
+    addressManager.setOracleFactoryAddress(OracleFactory.address);
+    return;
+  }).catch((err) => {
+    throw err;
   });
 };
