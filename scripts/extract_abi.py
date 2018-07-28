@@ -3,8 +3,10 @@
 import os
 import json
 
-dir_path = os.path.dirname('../build/contracts/')
-for file in os.listdir('../build/contracts'):
+path = '../build/contracts/'
+
+dir_path = os.path.dirname(path)
+for file in os.listdir(path):
     if file.endswith('.json'):
         with open(os.path.join(dir_path, file), 'r') as f:
             jsonObj = json.load(f)
