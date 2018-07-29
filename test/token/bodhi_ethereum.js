@@ -2,7 +2,7 @@ const assert = require('chai').assert;
 
 const BodhiEthereum = artifacts.require('./token/BodhiEthereum.sol');
 const BlockHeightManager = require('../util/block_height_manager');
-const Utils = require('../util/utils');
+const Utils = require('../util/');
 const SolAssert = require('../util/sol_assert');
 
 contract('BodhiEthereum', (accounts) => {

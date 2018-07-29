@@ -52,6 +52,12 @@ contract StandardEvent is BaseContract, Ownable {
         uint256 _betTokensAmount,
         uint256 _arbitrationTokensAmount
     );
+    event Test(
+        bool indexed _success,
+        address indexed _centralizedOracle,
+        address indexed _resultSetter,
+        uint8 _resultIndex
+    );
 
     // Modifiers
     modifier inCollectionStatus() {
@@ -127,6 +133,7 @@ contract StandardEvent is BaseContract, Ownable {
 
         if (functionId.equal(setResultFunc)) {
             setResult(centralizedOracle, resultSetter, resultIndex, _value);
+            emit Test(true, centralizedOracle, resultSetter, resultIndex);
         } else if (functionId.equal(voteFunc)) {
             vote(centralizedOracle, resultSetter, resultIndex, _value);
         } else {
