@@ -14,6 +14,11 @@ const config = {
       port: 8546,
       network_id: "*",
     },
+    ganache: {
+      host: "localhost",
+      port: 7545,
+      network_id: "*",
+    },
   },
   solc: {
     optimizer: {

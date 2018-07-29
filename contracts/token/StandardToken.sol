@@ -16,10 +16,15 @@ contract StandardToken is ERC223 {
         _;
     }
 
+    event TransferStep(
+        uint256 indexed _step
+    );
+
     /// @dev ERC20 method to transfer token to a specified address.
     /// @param _to The address to transfer to.
     /// @param _value The amount to be transferred.
     function transfer(address _to, uint256 _value) public returns (bool) {
+        emit TransferStep(0);
         bytes memory empty;
         transfer(_to, _value, empty);
     }
@@ -31,17 +36,25 @@ contract StandardToken is ERC223 {
     function transfer(address _to, uint256 _value, bytes _data) public validAddress(_to) returns (bool success) {
         uint codeLength;
 
+        emit TransferStep(1);
+
         assembly {
             // Retrieve the size of the code on target address, this needs assembly
             codeLength := extcodesize(_to)
         }
 
+        emit TransferStep(2);
+
         balances[msg.sender] = balances[msg.sender].sub(_value);
         balances[_to] = balances[_to].add(_value);
 
+        emit TransferStep(3);
+
         // Call token fallback function if _to is a contract. Rejects if not implemented.
         if (codeLength > 0) {
+            emit TransferStep(4);
             ERC223ReceivingContract(_to).tokenFallback(msg.sender, _value, _data);
+            emit TransferStep(5);
         }
 
         emit Transfer(msg.sender, _to, _value);

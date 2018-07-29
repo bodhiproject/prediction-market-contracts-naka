@@ -1,6 +1,6 @@
-const chai = require('chai');
 const Web3Beta = require('web3');
 const web3 = new Web3Beta(global.web3.currentProvider);
+const chai = require('chai');
 
 const StandardEvent = artifacts.require('./event/StandardEvent.sol');
 const BlockHeightManager = require('../util/block_height_manager');
@@ -43,18 +43,28 @@ contract('StandardToken', (accounts) => {
     const eventFactory = baseContracts.eventFactory;
 
     const tx = await eventFactory.createStandardEvent(...Object.values(getEventParams(OWNER)), { from: OWNER });
+    SolAssert.assertEvent(tx, 'StandardEventCreated');
     event = await StandardEvent.at(tx.logs[0].args._eventAddress);
   });
 
   describe.only('tokenFallback()', () => {
     it('calls setResult correctly', async () => {
-      const contract = new web3.eth.Contract(Abi.BodhiEthereum, token.address);
-      const tx = contract.methods["transfer(address,uint256,bytes)"](
-        event.address,
-        Utils.getBigNumberWithDecimals(100, 8),
-        '0x65f4ced18151550e91447748765e2eb05397fb5279ba532b6B36FDf89D706035DC97B6Aa4bC84b2418A452f103',
-      );
-      await tx.send({ from: OWNER });
+      const tx = await token.transfer(event.address, Utils.getBigNumberWithDecimals(100, 8), { from: OWNER });
+      
+      // const contract = new web3.eth.Contract(Abi.BodhiEthereum, token.address);
+      // const tx = contract.methods["transfer(address,uint256)"](
+      //   event.address,
+      //   Utils.getBigNumberWithDecimals(100, 8),
+      // );
+      // await tx.send({ from: OWNER });
+
+      // const contract = new web3.eth.Contract(Abi.BodhiEthereum, token.address);
+      // const tx = contract.methods["transfer(address,uint256,bytes)"](
+      //   event.address,
+      //   Utils.getBigNumberWithDecimals(100, 8),
+      //   '0x65f4ced18151550e91447748765e2eb05397fb5279ba532b6B36FDf89D706035DC97B6Aa4bC84b2418A452f103'
+      // );
+      // await tx.send({ from: OWNER });
     });
   });
 });

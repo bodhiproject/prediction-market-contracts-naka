@@ -12,7 +12,7 @@ import "../lib/SafeMath.sol";
 import "../lib/ByteUtils.sol";
 import "bytes/BytesLib.sol";
 
-contract StandardEvent is BaseContract, Ownable {
+contract StandardEvent is ERC223ReceivingContract, BaseContract, Ownable {
     using BytesLib for bytes;
     using ByteUtils for bytes32;
     using SafeMath for uint256;
@@ -52,7 +52,10 @@ contract StandardEvent is BaseContract, Ownable {
         uint256 _betTokensAmount,
         uint256 _arbitrationTokensAmount
     );
-    event Test(
+    event TokenFallbackHit(
+        uint256 indexed _number
+    );
+    event TokenFallbackParsed(
         bool indexed _success,
         address indexed _centralizedOracle,
         address indexed _resultSetter,
@@ -123,17 +126,23 @@ contract StandardEvent is BaseContract, Ownable {
     /// @param _value Amount of tokens.
     /// @param _data The message data. First 4 bytes is function hash & rest is function params.
     function tokenFallback(address _from, uint _value, bytes _data) external {
+        emit TokenFallbackHit(1);
+
         bytes memory functionId = _data.slice(0, 4);
         bytes memory setResultFunc = hex"65f4ced1";
         bytes memory voteFunc = hex"6f02d1fb";
+
+        emit TokenFallbackHit(2);
 
         address centralizedOracle = _data.toAddress(4);
         address resultSetter = _data.toAddress(24);
         uint8 resultIndex = uint8(_data.toUint(44));
 
+        emit TokenFallbackHit(3);
+
         if (functionId.equal(setResultFunc)) {
             setResult(centralizedOracle, resultSetter, resultIndex, _value);
-            emit Test(true, centralizedOracle, resultSetter, resultIndex);
+            emit TokenFallbackParsed(true, centralizedOracle, resultSetter, resultIndex);
         } else if (functionId.equal(voteFunc)) {
             vote(centralizedOracle, resultSetter, resultIndex, _value);
         } else {

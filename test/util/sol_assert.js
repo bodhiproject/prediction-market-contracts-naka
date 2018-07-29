@@ -13,4 +13,10 @@ module.exports = {
   assertBNNotEqual(first, second) {
     assert.notEqual(first.toString(), second.toString());
   },
+  assertEvent(tx, eventName) {
+    const found = tx.logs.find((log) => {
+      return log.event === eventName;
+    })
+    assert.isDefined(found, `Event ${eventName} not emitted`);
+  }
 };
