@@ -1,6 +1,32 @@
 pragma solidity ^0.4.24;
 
 library ByteUtils {
+    /// @dev Slices a bytes array and extracts a uint based on the starting offset.
+    /// @param _bytes The bytes array to slice.
+    /// @param _start The starting offset to slice the uint.
+    function sliceUint(bytes _bytes, uint _start) internal pure returns (uint) {
+        require(_bytes.length >= _start + 32);
+
+        uint x;
+        assembly {
+            x := mload(add(_bytes, add(0x20, _start)))
+        }
+        return x;
+    }
+
+    /// @dev Slices a bytes array and extracts an address based on the starting offset.
+    /// @param _bytes The bytes array to slice.
+    /// @param _start The starting offset to slice the address.
+    function sliceAddress(bytes _bytes, uint _start) internal pure returns (address) {
+        require(_bytes.length >= _start + 20);
+
+        address addr;
+        assembly {
+            addr := mload(add(_bytes, add(0x14, _start)))
+        }
+        return addr;
+    }
+
     function isEmpty(bytes32 _source) internal pure returns (bool) {
         return _source == 0x0;
     }

@@ -49,22 +49,21 @@ contract('StandardToken', (accounts) => {
 
   describe.only('tokenFallback()', () => {
     it('calls setResult correctly', async () => {
-      const tx = await token.transfer(event.address, Utils.getBigNumberWithDecimals(100, 8), { from: OWNER });
+      // const tx = await token.transfer(event.address, Utils.getBigNumberWithDecimals(100, 8), { from: OWNER });
       
       // const contract = new web3.eth.Contract(Abi.BodhiEthereum, token.address);
-      // const tx = contract.methods["transfer(address,uint256)"](
+      // const tx = await contract.methods["transfer(address,uint256)"](
       //   event.address,
       //   Utils.getBigNumberWithDecimals(100, 8),
-      // );
-      // await tx.send({ from: OWNER });
+      // ).send({ from: OWNER });
 
-      // const contract = new web3.eth.Contract(Abi.BodhiEthereum, token.address);
-      // const tx = contract.methods["transfer(address,uint256,bytes)"](
-      //   event.address,
-      //   Utils.getBigNumberWithDecimals(100, 8),
-      //   '0x65f4ced18151550e91447748765e2eb05397fb5279ba532b6B36FDf89D706035DC97B6Aa4bC84b2418A452f103'
-      // );
-      // await tx.send({ from: OWNER });
+      const contract = new web3.eth.Contract(Abi.BodhiEthereum, token.address);
+      const tx = await contract.methods["transfer(address,uint256,bytes)"](
+        event.address,
+        Utils.getBigNumberWithDecimals(100, 8),
+        '0x65f4ced18151550e91447748765e2eb05397fb5279ba532b6B36FDf89D706035DC97B6Aa4bC84b2418A452f10000000000000000000000000000000000000000000000000000000000000003'
+      ).send({ from: OWNER });
+      assert.fail();
     });
   });
 });
