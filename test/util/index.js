@@ -9,7 +9,7 @@ module.exports = class Utils {
   /*
   * Returns the original value increased by a percentage.
   * @param bigNumber {BigNumber} The BigNumber to increase.
-  * @param percentage {number} The percent amount to increase the number by.
+  * @param percentage {BigNumber} The percent amount to increase the number by.
   * @retun {BigNumber} The increased BigNumber by the percentage.
   */
   static percentIncrease(bigNumber, percentage) {

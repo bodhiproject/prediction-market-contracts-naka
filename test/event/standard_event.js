@@ -37,6 +37,8 @@ contract('StandardToken', (accounts) => {
   const ACCT2 = accounts[2];
   const ACCT3 = accounts[3];
 
+  let tokenDecimals;
+  let thresholdIncrease;
   let token;
   let eventParams;
   let event;
@@ -47,6 +49,11 @@ contract('StandardToken', (accounts) => {
     await timeMachine.snapshot();
 
     const baseContracts = await ContractHelper.initBaseContracts(OWNER, accounts);
+
+    const addressManager = baseContracts.addressManager;
+    tokenDecimals = await addressManager.tokenDecimals.call();
+    thresholdIncrease = await addressManager.thresholdPercentIncrease.call();
+
     token = baseContracts.bodhiToken;
     const eventFactory = baseContracts.eventFactory;
 
@@ -77,14 +84,19 @@ contract('StandardToken', (accounts) => {
 
   describe.only('tokenFallback()', () => {
     describe('setResult()', () => {
-      it('calls setResult correctly', async () => {
+      let threshold;
+
+      beforeEach(async () => {
+        threshold = await cOracle.consensusThreshold.call();
+
         // Advance to result setting start time
         await timeMachine.increaseTime(eventParams._resultSettingStartTime - Utils.getCurrentBlockTime());
         assert.isAtLeast(Utils.getCurrentBlockTime(), eventParams._resultSettingStartTime);
         assert.isBelow(Utils.getCurrentBlockTime(), eventParams._resultSettingEndTime);
-  
+      });
+
+      it('calls setResult correctly', async () => {
         // Call ERC223 transfer method
-        const threshold = Utils.getBigNumberWithDecimals(100, 8);
         const resultIndex = 3;
         const data = '0x65f4ced1'
           + Qweb3Utils.trimHexPrefix(cOracle.address)
@@ -112,7 +124,28 @@ contract('StandardToken', (accounts) => {
         const dOracle = await DecentralizedOracle.at(dOracleAddress);
         assert.equal(await dOracle.eventAddress.call(), event.address);
         assert.equal(await dOracle.lastResultIndex.call(), resultIndex);
-        SolAssert.assertBNEqual(await dOracle.consensusThreshold.call(), Utils.percentIncrease(threshold, 10));
+        SolAssert.assertBNEqual(await dOracle.consensusThreshold.call(),
+          Utils.percentIncrease(threshold, thresholdIncrease));
+      });
+
+      it('throws if the data length is not 76 bytes', async () => {
+        const resultIndex = 3;
+        let data = '0x65f4ced1'
+          + Qweb3Utils.trimHexPrefix(cOracle.address)
+          + Qweb3Utils.trimHexPrefix(OWNER)
+          + Encoder.uintToHex(resultIndex);
+        assert.equal(data.length, 154);
+        data = data.slice(0, 152);
+        assert.equal(data.length, 152);
+
+        const contract = new web3.eth.Contract(Abi.BodhiEthereum, token.address);
+        try {
+          await contract.methods["transfer(address,uint256,bytes)"](event.address, threshold, data)
+            .send({ from: OWNER, gas: 5000000 });
+          assert.fail();
+        } catch (e) {
+          SolAssert.assertRevert(e);
+        }
       });
     });
   });

@@ -126,6 +126,7 @@ contract StandardEvent is ERC223ReceivingContract, BaseContract, Ownable {
 
         bytes32 encodedFunc = keccak256(abi.encodePacked(funcHash));
         if (encodedFunc == keccak256(abi.encodePacked(setResultFunc))) {
+            assert(_data.length == 76);
             setResult(centralizedOracle, resultSetter, resultIndex, _value);
         } else if (encodedFunc == keccak256(abi.encodePacked(voteFunc))) {
             
