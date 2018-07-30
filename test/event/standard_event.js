@@ -148,5 +148,19 @@ contract('StandardToken', (accounts) => {
         }
       });
     });
+
+    it('throws if trying to call an unhandled function', async () => {
+      const contract = new web3.eth.Contract(Abi.BodhiEthereum, token.address);
+      try {
+        await contract.methods["transfer(address,uint256,bytes)"](
+          event.address,
+          Utils.getBigNumberWithDecimals(1, tokenDecimals),
+          '0xabcdef01'
+        ).send({ from: OWNER, gas: 5000000 });
+        assert.fail();
+      } catch (e) {
+        SolAssert.assertRevert(e);
+      }
+    });
   });
 });
