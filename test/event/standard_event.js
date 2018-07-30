@@ -199,18 +199,34 @@ contract('StandardEvent', (accounts) => {
         assert.equal(await dOracle.lastResultIndex.call(), setResultIndex);
       });
 
-      it('calls vote() correctly', async () => {
+      it('calls vote() correctly and sets the result when hitting the threshold', async () => {
         // Vote
-        const voteAmount = Utils.getBigNumberWithDecimals(50, tokenDecimals);
+        const threshold = await dOracle.consensusThreshold.call();
+        // const voteAmount = Utils.getBigNumberWithDecimals(50, tokenDecimals);
         const voteIndex = 1;
         const data = '0x6f02d1fb'
           + Qweb3Utils.trimHexPrefix(dOracle.address)
           + Qweb3Utils.trimHexPrefix(ACCT1)
           + Encoder.uintToHex(voteIndex);
-        await tokenContract.methods["transfer(address,uint256,bytes)"](event.address, voteAmount, data)
+        const tx = await tokenContract.methods["transfer(address,uint256,bytes)"](event.address, threshold, data)
           .send({ from: ACCT1, gas: 5000000 });
-        SolAssert.assertBNEqual((await dOracle.getTotalVotes())[voteIndex], voteAmount);
-        SolAssert.assertBNEqual((await dOracle.getVoteBalances({ from: ACCT1 }))[voteIndex], voteAmount);
+
+        // Validate event
+        assert.equal(await event.status.call(), EventStatus.ORACLE_VOTING);
+        assert.equal(await event.resultIndex.call(), voteIndex);
+
+        // Validate dOracle1
+        SolAssert.assertBNEqual((await dOracle.getTotalVotes())[voteIndex], threshold);
+        SolAssert.assertBNEqual((await dOracle.getVoteBalances({ from: ACCT1 }))[voteIndex], threshold);
+        assert.isTrue(await dOracle.finished.call());
+        assert.equal(await dOracle.resultIndex.call(), voteIndex);
+
+        // Validate dOracle2
+        const dOracle2Address = Utils.paddedHexToAddress(tx.events['2'].raw.topics[2]);
+        const dOracle2 = await DecentralizedOracle.at(dOracle2Address);
+        assert.equal(await dOracle2.lastResultIndex.call(), voteIndex);
+        SolAssert.assertBNEqual(await dOracle2.consensusThreshold.call(),
+          Utils.percentIncrease(threshold, thresholdIncrease));
       });
     });
 
