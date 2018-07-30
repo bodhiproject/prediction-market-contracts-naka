@@ -40,6 +40,7 @@ contract('StandardEvent', (accounts) => {
   let tokenDecimals;
   let thresholdIncrease;
   let token;
+  let tokenWeb3Contract;
   let eventParams;
   let event;
   let cOracle;
@@ -50,13 +51,14 @@ contract('StandardEvent', (accounts) => {
 
     const baseContracts = await ContractHelper.initBaseContracts(OWNER, accounts);
 
+    token = baseContracts.bodhiToken;
+    tokenWeb3Contract = new web3.eth.Contract(Abi.BodhiEthereum, token.address);
+    
     const addressManager = baseContracts.addressManager;
     tokenDecimals = await addressManager.tokenDecimals.call();
     thresholdIncrease = await addressManager.thresholdPercentIncrease.call();
-
-    token = baseContracts.bodhiToken;
+    
     const eventFactory = baseContracts.eventFactory;
-
     eventParams = getEventParams(OWNER);
     const tx = await eventFactory.createStandardEvent(...Object.values(eventParams), { from: OWNER });
     SolAssert.assertEvent(tx, 'StandardEventCreated');
@@ -102,8 +104,7 @@ contract('StandardEvent', (accounts) => {
           + Qweb3Utils.trimHexPrefix(cOracle.address)
           + Qweb3Utils.trimHexPrefix(OWNER)
           + Encoder.uintToHex(resultIndex);
-        const contract = new web3.eth.Contract(Abi.BodhiEthereum, token.address);
-        const tx = await contract.methods["transfer(address,uint256,bytes)"](event.address, threshold, data)
+        const tx = await tokenWeb3Contract.methods["transfer(address,uint256,bytes)"](event.address, threshold, data)
           .send({ from: OWNER, gas: 5000000 });
         
         // Validate event
@@ -138,9 +139,8 @@ contract('StandardEvent', (accounts) => {
         data = data.slice(0, 152);
         assert.equal(data.length, 152);
 
-        const contract = new web3.eth.Contract(Abi.BodhiEthereum, token.address);
         try {
-          await contract.methods["transfer(address,uint256,bytes)"](event.address, threshold, data)
+          await tokenWeb3Contract.methods["transfer(address,uint256,bytes)"](event.address, threshold, data)
             .send({ from: OWNER, gas: 5000000 });
           assert.fail();
         } catch (e) {
@@ -155,14 +155,13 @@ contract('StandardEvent', (accounts) => {
           + Qweb3Utils.trimHexPrefix(cOracle.address)
           + Qweb3Utils.trimHexPrefix(OWNER)
           + Encoder.uintToHex(resultIndex);
-        const contract = new web3.eth.Contract(Abi.BodhiEthereum, token.address);
-        await contract.methods["transfer(address,uint256,bytes)"](event.address, threshold, data)
+        await tokenWeb3Contract.methods["transfer(address,uint256,bytes)"](event.address, threshold, data)
           .send({ from: OWNER, gas: 5000000 });
         assert.equal(await event.status.call(), EventStatus.ORACLE_VOTING);
 
         // Try to set the result again
         try {
-          await contract.methods["transfer(address,uint256,bytes)"](event.address, threshold, data)
+          await tokenWeb3Contract.methods["transfer(address,uint256,bytes)"](event.address, threshold, data)
             .send({ from: OWNER, gas: 5000000 });
           assert.fail();
         } catch (e) {
@@ -172,7 +171,6 @@ contract('StandardEvent', (accounts) => {
     });
 
     describe('vote()', () => {
-      let tokenContract;
       let dOracle;
 
       beforeEach(async () => {
@@ -189,8 +187,7 @@ contract('StandardEvent', (accounts) => {
           + Qweb3Utils.trimHexPrefix(cOracle.address)
           + Qweb3Utils.trimHexPrefix(OWNER)
           + Encoder.uintToHex(setResultIndex);
-        tokenContract = new web3.eth.Contract(Abi.BodhiEthereum, token.address);
-        const tx = await tokenContract.methods["transfer(address,uint256,bytes)"](event.address, threshold, data)
+        const tx = await tokenWeb3Contract.methods["transfer(address,uint256,bytes)"](event.address, threshold, data)
           .send({ from: OWNER, gas: 5000000 });
 
         // Get dOracle
@@ -202,13 +199,12 @@ contract('StandardEvent', (accounts) => {
       it('calls vote() correctly and sets the result when hitting the threshold', async () => {
         // Vote
         const threshold = await dOracle.consensusThreshold.call();
-        // const voteAmount = Utils.getBigNumberWithDecimals(50, tokenDecimals);
         const voteIndex = 1;
         const data = '0x6f02d1fb'
           + Qweb3Utils.trimHexPrefix(dOracle.address)
           + Qweb3Utils.trimHexPrefix(ACCT1)
           + Encoder.uintToHex(voteIndex);
-        const tx = await tokenContract.methods["transfer(address,uint256,bytes)"](event.address, threshold, data)
+        const tx = await tokenWeb3Contract.methods["transfer(address,uint256,bytes)"](event.address, threshold, data)
           .send({ from: ACCT1, gas: 5000000 });
 
         // Validate event
@@ -228,12 +224,31 @@ contract('StandardEvent', (accounts) => {
         SolAssert.assertBNEqual(await dOracle2.consensusThreshold.call(),
           Utils.percentIncrease(threshold, thresholdIncrease));
       });
+
+      it('throws if the data length is not 76 bytes', async () => {
+        const voteAmount = Utils.getBigNumberWithDecimals(50, tokenDecimals);
+        const voteIndex = 1;
+        let data = '0x6f02d1fb'
+          + Qweb3Utils.trimHexPrefix(dOracle.address)
+          + Qweb3Utils.trimHexPrefix(ACCT1)
+          + Encoder.uintToHex(voteIndex);
+        assert.equal(data.length, 154);
+        data = data.slice(0, 152);
+        assert.equal(data.length, 152);
+
+        try {
+          await tokenWeb3Contract.methods["transfer(address,uint256,bytes)"](event.address, voteAmount, data)
+            .send({ from: ACCT1, gas: 5000000 });
+          assert.fail();
+        } catch (e) {
+          SolAssert.assertRevert(e);
+        }
+      });
     });
 
     it('throws if trying to call an unhandled function', async () => {
-      const contract = new web3.eth.Contract(Abi.BodhiEthereum, token.address);
       try {
-        await contract.methods["transfer(address,uint256,bytes)"](
+        await tokenWeb3Contract.methods["transfer(address,uint256,bytes)"](
           event.address,
           Utils.getBigNumberWithDecimals(1, tokenDecimals),
           '0xabcdef01'
