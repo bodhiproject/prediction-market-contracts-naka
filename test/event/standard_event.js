@@ -4,7 +4,6 @@ const chai = require('chai');
 const { each } = require('lodash');
 const Qweb3Utils = require('qweb3').Utils;
 const Encoder = require('qweb3').Encoder;
-const BigNumber = require('bignumber.js');
 
 const StandardEvent = artifacts.require('./event/StandardEvent.sol');
 const CentralizedOracle = artifacts.require('./oracle/CentralizedOracle.sol');
@@ -35,8 +34,6 @@ contract('StandardEvent', (accounts) => {
   const timeMachine = new TimeMachine(web3);
   const OWNER = accounts[0];
   const ACCT1 = accounts[1];
-  const ACCT2 = accounts[2];
-  const ACCT3 = accounts[3];
 
   let tokenDecimals;
   let thresholdIncrease;
