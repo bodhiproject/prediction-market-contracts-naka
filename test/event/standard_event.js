@@ -2,6 +2,8 @@ const Web3Beta = require('web3');
 const web3 = new Web3Beta(global.web3.currentProvider);
 const chai = require('chai');
 const { each } = require('lodash');
+const Qweb3Utils = require('qweb3').Utils;
+const Encoder = require('qweb3').Encoder;
 
 const StandardEvent = artifacts.require('./event/StandardEvent.sol');
 const CentralizedOracle = artifacts.require('./oracle/CentralizedOracle.sol');
@@ -77,13 +79,15 @@ contract('StandardToken', (accounts) => {
       // ).send({ from: OWNER });
 
       const contract = new web3.eth.Contract(Abi.BodhiEthereum, token.address);
-      // const data = '0x65f4ced1'
+      const data = '0x65f4ced1'
+        + Qweb3Utils.trimHexPrefix(cOracle.address)
+        + Qweb3Utils.trimHexPrefix(OWNER)
+        + Encoder.uintToHex(3);
       const tx = await contract.methods["transfer(address,uint256,bytes)"](
         event.address,
         Utils.getBigNumberWithDecimals(100, 8),
-        '0x65f4ced18151550e91447748765e2eb05397fb5279ba532b6B36FDf89D706035DC97B6Aa4bC84b2418A452f10000000000000000000000000000000000000000000000000000000000000003'
+        data,
       ).send({ from: OWNER });
-      assert.fail();
     });
   });
 });
