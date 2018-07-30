@@ -4,6 +4,7 @@ const chai = require('chai');
 const { each } = require('lodash');
 const Qweb3Utils = require('qweb3').Utils;
 const Encoder = require('qweb3').Encoder;
+const BigNumber = require('bignumber.js');
 
 const StandardEvent = artifacts.require('./event/StandardEvent.sol');
 const CentralizedOracle = artifacts.require('./oracle/CentralizedOracle.sol');
@@ -84,7 +85,7 @@ contract('StandardEvent', (accounts) => {
     await timeMachine.revert();
   });
 
-  describe.only('tokenFallback()', () => {
+  describe('tokenFallback()', () => {
     describe('setResult()', () => {
       let threshold;
 
@@ -226,7 +227,7 @@ contract('StandardEvent', (accounts) => {
       });
 
       it('throws if the data length is not 76 bytes', async () => {
-        const voteAmount = Utils.getBigNumberWithDecimals(50, tokenDecimals);
+        const voteAmount = Utils.toDenomination(50, tokenDecimals);
         const voteIndex = 1;
         let data = '0x6f02d1fb'
           + Qweb3Utils.trimHexPrefix(dOracle.address)
@@ -250,7 +251,7 @@ contract('StandardEvent', (accounts) => {
       try {
         await tokenWeb3Contract.methods["transfer(address,uint256,bytes)"](
           event.address,
-          Utils.getBigNumberWithDecimals(1, tokenDecimals),
+          Utils.toDenomination(1, tokenDecimals),
           '0xabcdef01'
         ).send({ from: OWNER, gas: 5000000 });
         assert.fail();

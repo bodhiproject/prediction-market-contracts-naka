@@ -1,9 +1,15 @@
 const web3 = global.web3;
 
 module.exports = class Utils {
-  // Converts the amount to a big number given the number of decimals
-  static getBigNumberWithDecimals(amount, numOfDecimals) {
-    return web3.toBigNumber(amount * (10 ** numOfDecimals));
+  /*
+  * Converts the amount to a lower denomination as a BigNumber.
+  * eg. (number: 1, decimals: 4) = 10000
+  * @param number {BigNumber|number|string} The number to convert.
+  * @param decimals {number} The denomination number of decimals to convert to.
+  * @retun {BigNumber} The converted BigNumber.
+  */
+  static toDenomination(number, decimals = 0) {
+    return web3.toBigNumber(number * (10 ** decimals));
   }
 
   /*

@@ -6,7 +6,7 @@ const OracleFactory = artifacts.require('./oracle/OracleFactory.sol');
 const Utils = require('.');
 
 const BOT_DECIMALS = 8;
-const BODHI_TOKENS_BALANCE = Utils.getBigNumberWithDecimals(100000, BOT_DECIMALS);
+const BODHI_TOKENS_BALANCE = Utils.toDenomination(100000, BOT_DECIMALS);
 
 module.exports = class ContractHelper {
   static async initBaseContracts(admin, accounts) {

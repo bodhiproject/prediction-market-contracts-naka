@@ -25,7 +25,7 @@ contract('BodhiEthereum', (accounts) => {
       assert.equal(await token.owner.call(), OWNER);
 
       const tokenTotalSupply = await token.tokenTotalSupply.call();
-      const expectedTokenTotalSupply = Utils.getBigNumberWithDecimals(100e6, decimals);
+      const expectedTokenTotalSupply = Utils.toDenomination(100e6, decimals);
       assert.equal(tokenTotalSupply.toString(), expectedTokenTotalSupply.toString());
     });
   });
