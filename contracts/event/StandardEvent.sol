@@ -121,15 +121,16 @@ contract StandardEvent is ERC223ReceivingContract, BaseContract, Ownable {
 
         bytes memory funcHash = _data.sliceBytes(0, 4);
         address centralizedOracle = _data.sliceAddress(4);
-        address resultSetter = _data.sliceAddress(24);
+        address user = _data.sliceAddress(24);
         uint8 resultIndex = uint8(_data.sliceUint(44));
 
         bytes32 encodedFunc = keccak256(abi.encodePacked(funcHash));
         if (encodedFunc == keccak256(abi.encodePacked(setResultFunc))) {
             assert(_data.length == 76);
-            setResult(centralizedOracle, resultSetter, resultIndex, _value);
+            setResult(centralizedOracle, user, resultIndex, _value);
         } else if (encodedFunc == keccak256(abi.encodePacked(voteFunc))) {
-            
+            assert(_data.length == 76);
+            vote(centralizedOracle, user, resultIndex, _value);
         } else {
             revert("Unhandled function in tokenFallback");
         }

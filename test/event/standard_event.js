@@ -30,7 +30,7 @@ const getEventParams = (oracle) => {
   };
 };
 
-contract('StandardToken', (accounts) => {
+contract('StandardEvent', (accounts) => {
   const timeMachine = new TimeMachine(web3);
   const OWNER = accounts[0];
   const ACCT1 = accounts[1];
@@ -82,7 +82,7 @@ contract('StandardToken', (accounts) => {
     await timeMachine.revert();
   });
 
-  describe('tokenFallback()', () => {
+  describe.only('tokenFallback()', () => {
     describe('setResult()', () => {
       let threshold;
 
@@ -95,7 +95,7 @@ contract('StandardToken', (accounts) => {
         assert.isBelow(Utils.getCurrentBlockTime(), eventParams._resultSettingEndTime);
       });
 
-      it('calls setResult correctly', async () => {
+      it('calls setResult() correctly', async () => {
         // Call ERC223 transfer method
         const resultIndex = 3;
         const data = '0x65f4ced1'
@@ -168,6 +168,49 @@ contract('StandardToken', (accounts) => {
         } catch (e) {
           SolAssert.assertRevert(e);
         }
+      });
+    });
+
+    describe('vote()', () => {
+      let tokenContract;
+      let dOracle;
+
+      beforeEach(async () => {
+        const threshold = await cOracle.consensusThreshold.call();
+
+        // Advance to result setting start time
+        await timeMachine.increaseTime(eventParams._resultSettingStartTime - Utils.getCurrentBlockTime());
+        assert.isAtLeast(Utils.getCurrentBlockTime(), eventParams._resultSettingStartTime);
+        assert.isBelow(Utils.getCurrentBlockTime(), eventParams._resultSettingEndTime);
+
+        // Set the result
+        const setResultIndex = 3;
+        const data = '0x65f4ced1'
+          + Qweb3Utils.trimHexPrefix(cOracle.address)
+          + Qweb3Utils.trimHexPrefix(OWNER)
+          + Encoder.uintToHex(setResultIndex);
+        tokenContract = new web3.eth.Contract(Abi.BodhiEthereum, token.address);
+        const tx = await tokenContract.methods["transfer(address,uint256,bytes)"](event.address, threshold, data)
+          .send({ from: OWNER, gas: 5000000 });
+
+        // Get dOracle
+        const dOracleAddress = Utils.paddedHexToAddress(tx.events['2'].raw.topics[2]);
+        dOracle = await DecentralizedOracle.at(dOracleAddress);
+        assert.equal(await dOracle.lastResultIndex.call(), setResultIndex);
+      });
+
+      it('calls vote() correctly', async () => {
+        // Vote
+        const voteAmount = Utils.getBigNumberWithDecimals(50, tokenDecimals);
+        const voteIndex = 1;
+        const data = '0x6f02d1fb'
+          + Qweb3Utils.trimHexPrefix(dOracle.address)
+          + Qweb3Utils.trimHexPrefix(ACCT1)
+          + Encoder.uintToHex(voteIndex);
+        await tokenContract.methods["transfer(address,uint256,bytes)"](event.address, voteAmount, data)
+          .send({ from: ACCT1, gas: 5000000 });
+        SolAssert.assertBNEqual((await dOracle.getTotalVotes())[voteIndex], voteAmount);
+        SolAssert.assertBNEqual((await dOracle.getVoteBalances({ from: ACCT1 }))[voteIndex], voteAmount);
       });
     });
 
