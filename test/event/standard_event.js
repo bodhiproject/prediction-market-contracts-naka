@@ -82,7 +82,7 @@ contract('StandardToken', (accounts) => {
     await timeMachine.revert();
   });
 
-  describe.only('tokenFallback()', () => {
+  describe('tokenFallback()', () => {
     describe('setResult()', () => {
       let threshold;
 
@@ -139,6 +139,28 @@ contract('StandardToken', (accounts) => {
         assert.equal(data.length, 152);
 
         const contract = new web3.eth.Contract(Abi.BodhiEthereum, token.address);
+        try {
+          await contract.methods["transfer(address,uint256,bytes)"](event.address, threshold, data)
+            .send({ from: OWNER, gas: 5000000 });
+          assert.fail();
+        } catch (e) {
+          SolAssert.assertRevert(e);
+        }
+      });
+
+      it('throws if the event status is not betting', async () => {
+        // Call ERC223 transfer method
+        let resultIndex = 3;
+        let data = '0x65f4ced1'
+          + Qweb3Utils.trimHexPrefix(cOracle.address)
+          + Qweb3Utils.trimHexPrefix(OWNER)
+          + Encoder.uintToHex(resultIndex);
+        const contract = new web3.eth.Contract(Abi.BodhiEthereum, token.address);
+        await contract.methods["transfer(address,uint256,bytes)"](event.address, threshold, data)
+          .send({ from: OWNER, gas: 5000000 });
+        assert.equal(await event.status.call(), EventStatus.ORACLE_VOTING);
+
+        // Try to set the result again
         try {
           await contract.methods["transfer(address,uint256,bytes)"](event.address, threshold, data)
             .send({ from: OWNER, gas: 5000000 });
