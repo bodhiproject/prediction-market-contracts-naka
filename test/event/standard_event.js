@@ -58,9 +58,9 @@ contract('StandardToken', (accounts) => {
     let cOracleAddress;
     each(tx.receipt.logs, (log) => {
       if (log.topics[0] === EventHash.STANDARD_EVENT_CREATED) {
-        eventAddress = Utils.removePaddedZeros(log.topics[2]);
+        eventAddress = Utils.paddedHexToAddress(log.topics[2]);
       } else if (log.topics[0] === EventHash.CENTRALIZED_ORACLE_CREATED) {
-        cOracleAddress = Utils.removePaddedZeros(log.topics[2]);
+        cOracleAddress = Utils.paddedHexToAddress(log.topics[2]);
       }
     });
 
@@ -108,7 +108,7 @@ contract('StandardToken', (accounts) => {
         SolAssert.assertBNEqual((await cOracle.getVoteBalances({ from: OWNER }))[resultIndex], threshold);
 
         // Validate dOracle created
-        const dOracleAddress = Utils.removePaddedZeros(tx.events['2'].raw.topics[2]);
+        const dOracleAddress = Utils.paddedHexToAddress(tx.events['2'].raw.topics[2]);
         const dOracle = await DecentralizedOracle.at(dOracleAddress);
         assert.equal(await dOracle.eventAddress.call(), event.address);
         assert.equal(await dOracle.lastResultIndex.call(), resultIndex);
