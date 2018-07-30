@@ -112,6 +112,7 @@ contract StandardEvent is ERC223ReceivingContract, BaseContract, Ownable {
     }
 
     event SetResultParams(
+        bytes _function,
         address _centralizedOracle,
         address _resultSetter,
         uint256 _resultIndex
@@ -125,27 +126,19 @@ contract StandardEvent is ERC223ReceivingContract, BaseContract, Ownable {
         bytes memory setResultFunc = hex"65f4ced1";
         bytes memory voteFunc = hex"6f02d1fb";
 
-        bytes memory funcHash = new bytes(4);
-        for (uint i = 0; i < 4; i++) {
-            funcHash[i] = _data[i];
-        }
-
+        bytes memory funcHash = _data.sliceBytes(0, 4);
         address centralizedOracle = _data.sliceAddress(4);
         address resultSetter = _data.sliceAddress(24);
         uint8 resultIndex = uint8(_data.sliceUint(44));
 
-        if (keccak256(abi.encodePacked(funcHash)) == keccak256(abi.encodePacked(setResultFunc))) {
-            emit SetResultParams(centralizedOracle, resultSetter, resultIndex);
+        bytes32 encodedFunc = keccak256(abi.encodePacked(funcHash));
+        if (encodedFunc == keccak256(abi.encodePacked(setResultFunc))) {
+            emit SetResultParams(funcHash, centralizedOracle, resultSetter, resultIndex);
+        } else if (encodedFunc == keccak256(abi.encodePacked(voteFunc))) {
+            
+        } else {
+            revert("Unhandled function in tokenFallback");
         }
-
-        // if (functionId.equal(setResultFunc)) {
-        //     setResult(centralizedOracle, resultSetter, resultIndex, _value);
-        //     emit TokenFallbackParsed(true, centralizedOracle, resultSetter, resultIndex);
-        // } else if (functionId.equal(voteFunc)) {
-        //     vote(centralizedOracle, resultSetter, resultIndex, _value);
-        // } else {
-        //     revert("Unhandled function in tokenFallback");
-        // }
     }
 
     /// @notice Places a bet.

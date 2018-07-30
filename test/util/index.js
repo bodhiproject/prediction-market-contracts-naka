@@ -21,4 +21,16 @@ module.exports = class Utils {
     const increaseAmount = amount.mul(percentIncrease).div(100);
     return web3.toBigNumber(Math.floor(amount.add(increaseAmount)));
   }
+
+  /*
+  * Removes the padded zeros in a hex string.
+  * eg. 0x0000000000000000000000006b36fdf89d706035dc97b6aa4bc84b2418a452f1 -> 0x6b36fdf89d706035dc97b6aa4bc84b2418a452f1
+  * @param hexString {string} The hex string to remove the leading zeros.
+  * @return {string} The hex string with the padded zeros removed.
+  */
+  static removePaddedZeros(hexString) {
+    const regex = new RegExp(/(0x)(0+)([a-fA-F0-9]+)/);
+    const matches = regex.exec(hexString);
+    return matches && matches[1] + matches[3];
+  }
 };

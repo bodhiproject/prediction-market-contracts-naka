@@ -1,13 +1,16 @@
 const Web3Beta = require('web3');
 const web3 = new Web3Beta(global.web3.currentProvider);
 const chai = require('chai');
+const { each } = require('lodash');
 
 const StandardEvent = artifacts.require('./event/StandardEvent.sol');
+const CentralizedOracle = artifacts.require('./oracle/CentralizedOracle.sol');
 const BlockHeightManager = require('../util/block_height_manager');
 const ContractHelper = require('../util/contract_helper');
 const SolAssert = require('../util/sol_assert');
 const Abi = require('../util/abi');
 const Utils = require('../util/');
+const EventHash = require('../event_hash');
 
 const { assert } = chai;
 
@@ -33,6 +36,7 @@ contract('StandardToken', (accounts) => {
 
   let token;
   let event;
+  let cOracle;
 
   beforeEach(blockHeightManager.snapshot);
   afterEach(blockHeightManager.revert);
@@ -44,7 +48,22 @@ contract('StandardToken', (accounts) => {
 
     const tx = await eventFactory.createStandardEvent(...Object.values(getEventParams(OWNER)), { from: OWNER });
     SolAssert.assertEvent(tx, 'StandardEventCreated');
-    event = await StandardEvent.at(tx.logs[0].args._eventAddress);
+
+    let eventAddress;
+    let cOracleAddress;
+    each(tx.receipt.logs, (log) => {
+      if (log.topics[0] === EventHash.STANDARD_EVENT_CREATED) {
+        eventAddress = Utils.removePaddedZeros(log.topics[2]);
+      } else if (log.topics[0] === EventHash.CENTRALIZED_ORACLE_CREATED) {
+        cOracleAddress = Utils.removePaddedZeros(log.topics[2]);
+      }
+    });
+
+    event = await StandardEvent.at(eventAddress);
+    assert.isDefined(event);
+
+    cOracle = await CentralizedOracle.at(cOracleAddress);
+    assert.isDefined(cOracle);
   });
 
   describe.only('tokenFallback()', () => {
@@ -58,6 +77,7 @@ contract('StandardToken', (accounts) => {
       // ).send({ from: OWNER });
 
       const contract = new web3.eth.Contract(Abi.BodhiEthereum, token.address);
+      // const data = '0x65f4ced1'
       const tx = await contract.methods["transfer(address,uint256,bytes)"](
         event.address,
         Utils.getBigNumberWithDecimals(100, 8),
