@@ -6,20 +6,19 @@ module.exports = class Utils {
     return web3.toBigNumber(amount * (10 ** numOfDecimals));
   }
 
+  /*
+  * Returns the original value increased by a percentage.
+  * @param bigNumber {BigNumber} The BigNumber to increase.
+  * @param percentage {number} The percent amount to increase the number by.
+  * @retun {BigNumber} The increased BigNumber by the percentage.
+  */
+  static percentIncrease(bigNumber, percentage) {
+    return bigNumber.times(web3.toBigNumber(percentage)).div(web3.toBigNumber(100)).plus(bigNumber);
+  }
+
   // Gets the unix time in seconds of the current block
   static getCurrentBlockTime() {
     return web3.eth.getBlock(web3.eth.blockNumber).timestamp;
-  }
-
-  /*
-  * Calculates the new big number after a percentage increase
-  * @param amount {BN} The original number to increase.
-  * @param percentIncrease {Number} The percentage to increase as a whole number.
-  * @return {BN} The big number with percentage increase.
-  */
-  static getPercentageIncrease(amount, percentIncrease) {
-    const increaseAmount = amount.mul(percentIncrease).div(100);
-    return web3.toBigNumber(Math.floor(amount.add(increaseAmount)));
   }
 
   /*

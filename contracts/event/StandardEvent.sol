@@ -111,13 +111,6 @@ contract StandardEvent is ERC223ReceivingContract, BaseContract, Ownable {
         revert();
     }
 
-    event SetResultParams(
-        bytes _function,
-        address _centralizedOracle,
-        address _resultSetter,
-        uint256 _resultIndex
-    );
-
     /// @dev Standard ERC223 function that will handle incoming token transfers.
     /// @param _from Token sender address.
     /// @param _value Amount of tokens.
@@ -133,7 +126,7 @@ contract StandardEvent is ERC223ReceivingContract, BaseContract, Ownable {
 
         bytes32 encodedFunc = keccak256(abi.encodePacked(funcHash));
         if (encodedFunc == keccak256(abi.encodePacked(setResultFunc))) {
-            emit SetResultParams(funcHash, centralizedOracle, resultSetter, resultIndex);
+            setResult(centralizedOracle, resultSetter, resultIndex, _value);
         } else if (encodedFunc == keccak256(abi.encodePacked(voteFunc))) {
             
         } else {
