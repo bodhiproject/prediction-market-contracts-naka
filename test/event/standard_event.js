@@ -19,7 +19,7 @@ const Utils = require('../util/');
 const { assert } = chai;
 
 const getEventParams = (oracle) => {
-  const currTime = Utils.getCurrentBlockTime();
+  const currTime = Utils.currentBlockTime();
   return {
     _oracle: oracle,
     _name: ['Will Apple stock reach $300 by t', 'he end of 2017?'],
@@ -93,9 +93,9 @@ contract('StandardEvent', (accounts) => {
         threshold = await cOracle.consensusThreshold.call();
 
         // Advance to result setting start time
-        await timeMachine.increaseTime(eventParams._resultSettingStartTime - Utils.getCurrentBlockTime());
-        assert.isAtLeast(Utils.getCurrentBlockTime(), eventParams._resultSettingStartTime);
-        assert.isBelow(Utils.getCurrentBlockTime(), eventParams._resultSettingEndTime);
+        await timeMachine.increaseTime(eventParams._resultSettingStartTime - Utils.currentBlockTime());
+        assert.isAtLeast(Utils.currentBlockTime(), eventParams._resultSettingStartTime);
+        assert.isBelow(Utils.currentBlockTime(), eventParams._resultSettingEndTime);
       });
 
       it('calls setResult() correctly', async () => {
@@ -178,9 +178,9 @@ contract('StandardEvent', (accounts) => {
         const threshold = await cOracle.consensusThreshold.call();
 
         // Advance to result setting start time
-        await timeMachine.increaseTime(eventParams._resultSettingStartTime - Utils.getCurrentBlockTime());
-        assert.isAtLeast(Utils.getCurrentBlockTime(), eventParams._resultSettingStartTime);
-        assert.isBelow(Utils.getCurrentBlockTime(), eventParams._resultSettingEndTime);
+        await timeMachine.increaseTime(eventParams._resultSettingStartTime - Utils.currentBlockTime());
+        assert.isAtLeast(Utils.currentBlockTime(), eventParams._resultSettingStartTime);
+        assert.isBelow(Utils.currentBlockTime(), eventParams._resultSettingEndTime);
 
         // Set the result
         const setResultIndex = 3;

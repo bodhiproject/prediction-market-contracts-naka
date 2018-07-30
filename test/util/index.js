@@ -23,7 +23,7 @@ module.exports = class Utils {
   }
 
   // Gets the unix time in seconds of the current block
-  static getCurrentBlockTime() {
+  static currentBlockTime() {
     return web3.eth.getBlock(web3.eth.blockNumber).timestamp;
   }
 
