@@ -17,7 +17,6 @@ const { EventHash, EventStatus } = require('../util/constants');
 const Utils = require('../util/');
 
 const { assert } = chai;
-const ethAsync = bluebird.promisifyAll(web3.eth);
 
 const getEventParams = (oracle) => {
   const currTime = Utils.currentBlockTime();
@@ -33,10 +32,11 @@ const getEventParams = (oracle) => {
 };
 
 contract('StandardEvent', (accounts) => {
-  const timeMachine = new TimeMachine(web3);
+  const BET_TOKEN_DECIMALS = 18;
   const OWNER = accounts[0];
   const ACCT1 = accounts[1];
   const RESULT_INVALID = 'Invalid';
+  const timeMachine = new TimeMachine(web3);
 
   let tokenDecimals;
   let thresholdIncrease;
@@ -378,7 +378,7 @@ contract('StandardEvent', (accounts) => {
   describe('fallback function', () => {
     it('throws upon calling', async () => {
       try {
-        await ethAsync.sendTransactionAsync({
+        await bluebird.promisify(web3.eth.sendTransaction)({
           to: event.address,
           from: OWNER,
           value: 1,
@@ -563,6 +563,25 @@ contract('StandardEvent', (accounts) => {
       } catch (e) {
         SolAssert.assertRevert(e);
       }
+    });
+  });
+
+  describe('bet()', () => {
+    beforeEach(async () => {
+      await timeMachine.increaseTime(eventParams._bettingStartTime - Utils.currentBlockTime());
+      assert.isAtLeast(Utils.currentBlockTime(), eventParams._bettingStartTime);
+      assert.isBelow(Utils.currentBlockTime(), eventParams._bettingEndTime);
+    });
+
+    it('allows users to bet', async () => {
+      const betAmount = Utils.toDenomination(1, BET_TOKEN_DECIMALS);
+      const betResultIndex = 0;
+      await event.bet(cOracle.address, betResultIndex, { from: ACCT1, value: betAmount });
+
+      SolAssert.assertBNEqual((await event.getTotalBets())[betResultIndex], betAmount);
+      const betBalances = await event.getBetBalances({ from: ACCT1 });
+      SolAssert.assertBNEqual(betBalances[betResultIndex], betAmount);
+      SolAssert.assertBNEqual(await event.totalBetTokens.call(), betAmount);
     });
   });
 });
