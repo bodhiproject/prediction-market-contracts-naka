@@ -1,4 +1,7 @@
-const assert = require('chai').assert;
+const chai = require('chai');
+
+const web3 = global.web3;
+const { assert } = chai;
 
 module.exports = {
   assertRevert(error) {
@@ -12,6 +15,9 @@ module.exports = {
   },
   assertBNNotEqual(first, second) {
     assert.notEqual(first.toString(), second.toString());
+  },
+  bytesStrEqual(bytesString, string) {
+    assert.equal(web3.toUtf8(bytesString), string);
   },
   assertEvent(tx, eventName) {
     const found = tx.logs.find((log) => {

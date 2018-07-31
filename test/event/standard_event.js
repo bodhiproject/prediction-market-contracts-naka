@@ -34,9 +34,11 @@ contract('StandardEvent', (accounts) => {
   const timeMachine = new TimeMachine(web3);
   const OWNER = accounts[0];
   const ACCT1 = accounts[1];
+  const RESULT_INVALID = 'Invalid';
 
   let tokenDecimals;
   let thresholdIncrease;
+  let addressManager;
   let token;
   let tokenWeb3Contract;
   let eventParams;
@@ -48,13 +50,12 @@ contract('StandardEvent', (accounts) => {
     await timeMachine.snapshot();
 
     const baseContracts = await ContractHelper.initBaseContracts(OWNER, accounts);
+    addressManager = baseContracts.addressManager;
+    tokenDecimals = await addressManager.tokenDecimals.call();
+    thresholdIncrease = await addressManager.thresholdPercentIncrease.call();
 
     token = baseContracts.bodhiToken;
     tokenWeb3Contract = new web3.eth.Contract(Abi.BodhiEthereum, token.address);
-    
-    const addressManager = baseContracts.addressManager;
-    tokenDecimals = await addressManager.tokenDecimals.call();
-    thresholdIncrease = await addressManager.thresholdPercentIncrease.call();
     
     const eventFactory = baseContracts.eventFactory;
     eventParams = getEventParams(OWNER);
@@ -80,6 +81,296 @@ contract('StandardEvent', (accounts) => {
 
   afterEach(async () => {
     await timeMachine.revert();
+  });
+
+  describe('constructor', () => {
+    const resultNames = ['Invalid', 'first', 'second', 'third'];
+    const numOfResults = 4;
+
+    it('initializes all the values', async () => {
+      assert.equal(await event.owner.call(), OWNER);
+      SolAssert.bytesStrEqual(await event.eventName.call(0), eventParams._name[0]);
+      SolAssert.bytesStrEqual(await event.eventName.call(1), eventParams._name[1]);
+      SolAssert.bytesStrEqual(await event.eventResults.call(0), RESULT_INVALID);
+      SolAssert.bytesStrEqual(await event.eventResults.call(1), eventParams._resultNames[0]);
+      SolAssert.bytesStrEqual(await event.eventResults.call(2), eventParams._resultNames[1]);
+      SolAssert.bytesStrEqual(await event.eventResults.call(3), eventParams._resultNames[2]);
+      assert.equal((await event.numOfResults.call()).toNumber(), numOfResults);
+      SolAssert.assertBNEqual(await event.escrowAmount.call(), await addressManager.eventEscrowAmount.call());
+
+      assert.equal(await cOracle.numOfResults.call(), numOfResults);
+      assert.equal(await cOracle.oracle.call(), eventParams._oracle);
+      SolAssert.assertBNEqual(await cOracle.bettingStartTime.call(), eventParams._bettingStartTime);
+      SolAssert.assertBNEqual(await cOracle.bettingEndTime.call(), eventParams._bettingEndTime);
+      SolAssert.assertBNEqual(await cOracle.resultSettingStartTime.call(), eventParams._resultSettingStartTime);
+      SolAssert.assertBNEqual(await cOracle.resultSettingEndTime.call(), eventParams._resultSettingEndTime);
+      SolAssert.assertBNEqual(
+        await cOracle.consensusThreshold.call(),
+        await addressManager.startingOracleThreshold.call(),
+      );
+    });
+
+    it('can handle a long name using all 10 array slots', async () => {
+      const name = ['abcdefghijklmnopqrstuvwxyzabcdef', 'abcdefghijklmnopqrstuvwxyzabcdef',
+        'abcdefghijklmnopqrstuvwxyzabcdef', 'abcdefghijklmnopqrstuvwxyzabcdef',
+        'abcdefghijklmnopqrstuvwxyzabcdef', 'abcdefghijklmnopqrstuvwxyzabcdef',
+        'abcdefghijklmnopqrstuvwxyzabcdef', 'abcdefghijklmnopqrstuvwxyzabcdef',
+        'abcdefghijklmnopqrstuvwxyzabcdef', 'abcdefghijklmnopqrstuvwxyzabcdef'];
+
+      event = await StandardEvent.new(
+        0, OWNER, eventParams._oracle, name, resultNames, numOfResults, eventParams._bettingStartTime,
+        eventParams._bettingEndTime, eventParams._resultSettingStartTime, eventParams._resultSettingEndTime,
+        addressManager.address,
+      );
+
+      SolAssert.bytesStrEqual(await event.eventName.call(0), name[0]);
+      SolAssert.bytesStrEqual(await event.eventName.call(1), name[1]);
+      SolAssert.bytesStrEqual(await event.eventName.call(2), name[2]);
+      SolAssert.bytesStrEqual(await event.eventName.call(3), name[3]);
+      SolAssert.bytesStrEqual(await event.eventName.call(4), name[4]);
+      SolAssert.bytesStrEqual(await event.eventName.call(5), name[5]);
+      SolAssert.bytesStrEqual(await event.eventName.call(6), name[6]);
+      SolAssert.bytesStrEqual(await event.eventName.call(7), name[7]);
+      SolAssert.bytesStrEqual(await event.eventName.call(8), name[8]);
+      SolAssert.bytesStrEqual(await event.eventName.call(9), name[9]);
+    });
+
+    it('should only concatenate first 10 array slots of the name array', async () => {
+      const name = ['abcdefghijklmnopqrstuvwxyzabcdef', 'abcdefghijklmnopqrstuvwxyzabcdef',
+        'abcdefghijklmnopqrstuvwxyzabcdef', 'abcdefghijklmnopqrstuvwxyzabcdef',
+        'abcdefghijklmnopqrstuvwxyzabcdef', 'abcdefghijklmnopqrstuvwxyzabcdef',
+        'abcdefghijklmnopqrstuvwxyzabcdef', 'abcdefghijklmnopqrstuvwxyzabcdef',
+        'abcdefghijklmnopqrstuvwxyzabcdef', 'abcdefghijklmnopqrstuvwxyzabcdef',
+        'abcdefghijklmnopqrstuvwxyzabcdef'];
+      event = await StandardEvent.new(
+        0, OWNER, eventParams._oracle, name, resultNames, numOfResults, eventParams._bettingStartTime,
+        eventParams._bettingEndTime, eventParams._resultSettingStartTime, eventParams._resultSettingEndTime,
+        addressManager.address,
+      );
+
+      SolAssert.bytesStrEqual(await event.eventName.call(0), name[0]);
+      SolAssert.bytesStrEqual(await event.eventName.call(1), name[1]);
+      SolAssert.bytesStrEqual(await event.eventName.call(2), name[2]);
+      SolAssert.bytesStrEqual(await event.eventName.call(3), name[3]);
+      SolAssert.bytesStrEqual(await event.eventName.call(4), name[4]);
+      SolAssert.bytesStrEqual(await event.eventName.call(5), name[5]);
+      SolAssert.bytesStrEqual(await event.eventName.call(6), name[6]);
+      SolAssert.bytesStrEqual(await event.eventName.call(7), name[7]);
+      SolAssert.bytesStrEqual(await event.eventName.call(8), name[8]);
+      SolAssert.bytesStrEqual(await event.eventName.call(9), name[9]);
+    });
+
+    it('should allow a space as the last character of a name array item', async () => {
+      const name = ['abcdefghijklmnopqrstuvwxyzabcde ', 'fghijklmnopqrstuvwxyz'];
+      event = await StandardEvent.new(
+        0, OWNER, eventParams._oracle, name, resultNames, numOfResults, eventParams._bettingStartTime,
+        eventParams._bettingEndTime, eventParams._resultSettingStartTime, eventParams._resultSettingEndTime,
+        addressManager.address,
+      );
+
+      SolAssert.bytesStrEqual(await event.eventName.call(0), name[0]);
+      SolAssert.bytesStrEqual(await event.eventName.call(1), name[1]);
+    });
+
+    it(
+      'should allow a space as the first character if the next character is not empty in a name array item',
+      async () => {
+        const name = ['abcdefghijklmnopqrstuvwxyzabcdef', ' ghijklmnopqrstuvwxyz'];
+        event = await StandardEvent.new(
+          0, OWNER, eventParams._oracle, name, resultNames, numOfResults, eventParams._bettingStartTime,
+          eventParams._bettingEndTime, eventParams._resultSettingStartTime, eventParams._resultSettingEndTime,
+          addressManager.address,
+        );
+
+        SolAssert.bytesStrEqual(await event.eventName.call(0), name[0]);
+        SolAssert.bytesStrEqual(await event.eventName.call(1), name[1]);
+      },
+    );
+
+    it('can handle using all 11 results', async () => {
+      const results = [RESULT_INVALID, 'first', 'second', 'third', 'fourth', 'fifth', 'sixth', 'seventh', 'eighth',
+        'ninth', 'ten'];
+      event = await StandardEvent.new(
+        0, OWNER, eventParams._oracle, eventParams._name, results, 11,
+        eventParams._bettingStartTime, eventParams._bettingEndTime,
+        eventParams._resultSettingStartTime, eventParams._resultSettingEndTime,
+        addressManager.address,
+      );
+
+      SolAssert.bytesStrEqual(await event.eventResults.call(0), results[0]);
+      SolAssert.bytesStrEqual(await event.eventResults.call(1), results[1]);
+      SolAssert.bytesStrEqual(await event.eventResults.call(2), results[2]);
+      SolAssert.bytesStrEqual(await event.eventResults.call(3), results[3]);
+      SolAssert.bytesStrEqual(await event.eventResults.call(4), results[4]);
+      SolAssert.bytesStrEqual(await event.eventResults.call(5), results[5]);
+      SolAssert.bytesStrEqual(await event.eventResults.call(6), results[6]);
+      SolAssert.bytesStrEqual(await event.eventResults.call(7), results[7]);
+      SolAssert.bytesStrEqual(await event.eventResults.call(8), results[8]);
+      SolAssert.bytesStrEqual(await event.eventResults.call(9), results[9]);
+      SolAssert.bytesStrEqual(await event.eventResults.call(10), results[10]);
+    });
+
+    it('should only set the first 10 results', async () => {
+      const results = [RESULT_INVALID, 'first', 'second', 'third', 'fourth', 'fifth', 'sixth', 'seventh', 'eighth',
+        'ninth', 'ten', 'eleven'];
+      event = await StandardEvent.new(
+        0, OWNER, eventParams._oracle, eventParams._name, results, 11,
+        eventParams._bettingStartTime, eventParams._bettingEndTime,
+        eventParams._resultSettingStartTime, eventParams._resultSettingEndTime,
+        addressManager.address,
+      );
+
+      SolAssert.bytesStrEqual(await event.eventResults.call(0), results[0]);
+      SolAssert.bytesStrEqual(await event.eventResults.call(1), results[1]);
+      SolAssert.bytesStrEqual(await event.eventResults.call(2), results[2]);
+      SolAssert.bytesStrEqual(await event.eventResults.call(3), results[3]);
+      SolAssert.bytesStrEqual(await event.eventResults.call(4), results[4]);
+      SolAssert.bytesStrEqual(await event.eventResults.call(5), results[5]);
+      SolAssert.bytesStrEqual(await event.eventResults.call(6), results[6]);
+      SolAssert.bytesStrEqual(await event.eventResults.call(7), results[7]);
+      SolAssert.bytesStrEqual(await event.eventResults.call(8), results[8]);
+      SolAssert.bytesStrEqual(await event.eventResults.call(9), results[9]);
+      SolAssert.bytesStrEqual(await event.eventResults.call(10), results[10]);
+
+      try {
+        await event.eventResults.call(11);
+        assert.fail();
+      } catch (e) {
+        SolAssert.assertInvalidOpcode(e);
+      }
+    });
+
+    it('throws if owner address is invalid', async () => {
+      try {
+        await StandardEvent.new(
+          0, 0, eventParams._oracle, eventParams._name, eventParams._resultNames, numOfResults,
+          eventParams._bettingStartTime, eventParams._bettingEndTime,
+          eventParams._resultSettingStartTime, eventParams._resultSettingEndTime,
+          addressManager.address,
+        );
+        assert.fail();
+      } catch (e) {
+        SolAssert.assertRevert(e);
+      }
+    });
+
+    it('throws if oracle address is invalid', async () => {
+      try {
+        await StandardEvent.new(
+          0, OWNER, 0, eventParams._name, eventParams._resultNames, numOfResults, eventParams._bettingStartTime,
+          eventParams._bettingEndTime, eventParams._resultSettingStartTime, eventParams._resultSettingEndTime,
+          addressManager.address,
+        );
+        assert.fail();
+      } catch (e) {
+        SolAssert.assertRevert(e);
+      }
+    });
+
+    it('throws if AddressManager address is invalid', async () => {
+      try {
+        await StandardEvent.new(
+          0, OWNER, eventParams._centralizedOracle, eventParams._name, eventParams._resultNames, numOfResults,
+          eventParams._bettingStartTime, eventParams._bettingEndTime, eventParams._resultSettingStartTime,
+          eventParams._resultSettingEndTime, 0,
+        );
+        assert.fail();
+      } catch (e) {
+        SolAssert.assertRevert(e);
+      }
+    });
+
+    it('throws if name is empty', async () => {
+      try {
+        await StandardEvent.new(
+          0, OWNER, eventParams._centralizedOracle, [], eventParams._resultNames, numOfResults,
+          eventParams._bettingStartTime, eventParams._bettingEndTime,
+          eventParams._resultSettingStartTime, eventParams._resultSettingEndTime,
+          addressManager.address,
+        );
+        assert.fail();
+      } catch (e) {
+        SolAssert.assertRevert(e);
+      }
+    });
+
+    it('throws if eventResults 0 or 1 are empty', async () => {
+      try {
+        await StandardEvent.new(
+          0, OWNER, eventParams._centralizedOracle, eventParams._name, [], 1,
+          eventParams._bettingStartTime, eventParams._bettingEndTime,
+          eventParams._resultSettingStartTime, eventParams._resultSettingEndTime,
+          addressManager.address,
+        );
+        assert.fail();
+      } catch (e) {
+        SolAssert.assertRevert(e);
+      }
+
+      try {
+        await StandardEvent.new(
+          0, eventParams._owner, eventParams._centralizedOracle, eventParams._name,
+          ['first'], 2, eventParams._bettingStartTime, eventParams._bettingEndTime,
+          eventParams._resultSettingStartTime, eventParams._resultSettingEndTime,
+          addressManager.address,
+        );
+        assert.fail();
+      } catch (e) {
+        SolAssert.assertRevert(e);
+      }
+
+      try {
+        await StandardEvent.new(
+          0, OWNER, eventParams._centralizedOracle, eventParams._name, ['', 'second'], 2,
+          eventParams._bettingStartTime, eventParams._bettingEndTime,
+          eventParams._resultSettingStartTime, eventParams._resultSettingEndTime,
+          addressManager.address,
+        );
+        assert.fail();
+      } catch (e) {
+        SolAssert.assertRevert(e);
+      }
+    });
+
+    it('throws if bettingEndTime is <= bettingStartTime', async () => {
+      try {
+        await StandardEvent.new(
+          0, OWNER, eventParams._centralizedOracle, eventParams._name,
+          eventParams._resultNames, numOfResults, eventParams._bettingStartTime, eventParams._bettingStartTime,
+          eventParams._resultSettingStartTime, eventParams._resultSettingEndTime,
+          addressManager.address,
+        );
+        assert.fail();
+      } catch (e) {
+        SolAssert.assertRevert(e);
+      }
+    });
+
+    it('throws if resultSettingStartTime is < bettingEndTime', async () => {
+      try {
+        await StandardEvent.new(
+          0, OWNER, eventParams._centralizedOracle, eventParams._name,
+          eventParams._resultNames, numOfResults, eventParams._bettingStartTime, eventParams._bettingEndTime,
+          eventParams._bettingEndTime - 1, eventParams._resultSettingEndTime, addressManager.address,
+        );
+        assert.fail();
+      } catch (e) {
+        SolAssert.assertRevert(e);
+      }
+    });
+
+    it('throws if resultSettingEndTime is <= resultSettingStartTime', async () => {
+      try {
+        await StandardEvent.new(
+          0, OWNER, eventParams._centralizedOracle, eventParams._name,
+          eventParams._resultNames, numOfResults, eventParams._bettingStartTime, eventParams._bettingEndTime,
+          eventParams._resultSettingStartTime, eventParams._resultSettingStartTime, addressManager.address,
+        );
+        assert.fail();
+      } catch (e) {
+        SolAssert.assertRevert(e);
+      }
+    });
   });
 
   describe('tokenFallback()', () => {
