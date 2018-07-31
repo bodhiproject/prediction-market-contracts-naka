@@ -1,9 +1,16 @@
+const Web3Beta = require('web3');
+const Qweb3Utils = require('qweb3').Utils;
+const Encoder = require('qweb3').Encoder;
+
 const AddressManager = artifacts.require('./storage/AddressManager.sol');
 const BodhiEthereum = artifacts.require('./token/BodhiEthereum.sol');
 const EventFactory = artifacts.require('./event/EventFactory.sol');
 const OracleFactory = artifacts.require('./oracle/OracleFactory.sol');
 
 const Utils = require('.');
+const Abi = require('./abi');
+
+const web3 = new Web3Beta(global.web3.currentProvider);
 
 const BOT_DECIMALS = 8;
 const BODHI_TOKENS_BALANCE = Utils.toDenomination(100000, BOT_DECIMALS);
@@ -69,5 +76,27 @@ module.exports = class ContractHelper {
   static async approve(tokenContract, sender, to, amount) {
     await tokenContract.approve(to, amount, { from: sender });
     assert.equal((await tokenContract.allowance(sender, to)).toString(), amount.toString());
+  }
+
+  static async transferSetResult(token, event, cOracle, resultSetter, resultIndex, amount) {
+    const data = '0x65f4ced1'
+      + Qweb3Utils.trimHexPrefix(cOracle.address)
+      + Qweb3Utils.trimHexPrefix(resultSetter)
+      + Encoder.uintToHex(resultIndex);
+
+    const tokenWeb3Contract = new web3.eth.Contract(Abi.BodhiEthereum, token.address);
+    return await tokenWeb3Contract.methods["transfer(address,uint256,bytes)"](event.address, amount, data)
+      .send({ from: resultSetter, gas: 5000000 });
+  }
+
+  static async transferVote(token, event, dOracle, voter, resultIndex, amount) {
+    const data = '0x6f02d1fb'
+      + Qweb3Utils.trimHexPrefix(dOracle.address)
+      + Qweb3Utils.trimHexPrefix(voter)
+      + Encoder.uintToHex(resultIndex);
+
+    const tokenWeb3Contract = new web3.eth.Contract(Abi.BodhiEthereum, token.address);
+    return await tokenWeb3Contract.methods["transfer(address,uint256,bytes)"](event.address, amount, data)
+      .send({ from: voter, gas: 5000000 });
   }
 };

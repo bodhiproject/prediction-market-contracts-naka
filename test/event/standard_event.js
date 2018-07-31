@@ -406,12 +406,7 @@ contract('StandardEvent', (accounts) => {
       it('calls setResult() correctly', async () => {
         // Call ERC223 transfer method
         const resultIndex = 3;
-        const data = '0x65f4ced1'
-          + Qweb3Utils.trimHexPrefix(cOracle.address)
-          + Qweb3Utils.trimHexPrefix(OWNER)
-          + Encoder.uintToHex(resultIndex);
-        const tx = await tokenWeb3Contract.methods["transfer(address,uint256,bytes)"](event.address, threshold, data)
-          .send({ from: OWNER, gas: 5000000 });
+        const tx = await ContractHelper.transferSetResult(token, event, cOracle, OWNER, resultIndex, threshold, OWNER);
         
         // Validate event
         assert.equal(await event.status.call(), EventStatus.ORACLE_VOTING);
@@ -457,18 +452,12 @@ contract('StandardEvent', (accounts) => {
       it('throws if the event status is not betting', async () => {
         // Call ERC223 transfer method
         let resultIndex = 3;
-        let data = '0x65f4ced1'
-          + Qweb3Utils.trimHexPrefix(cOracle.address)
-          + Qweb3Utils.trimHexPrefix(OWNER)
-          + Encoder.uintToHex(resultIndex);
-        await tokenWeb3Contract.methods["transfer(address,uint256,bytes)"](event.address, threshold, data)
-          .send({ from: OWNER, gas: 5000000 });
+        await ContractHelper.transferSetResult(token, event, cOracle, OWNER, resultIndex, threshold, OWNER);
         assert.equal(await event.status.call(), EventStatus.ORACLE_VOTING);
 
         // Try to set the result again
         try {
-          await tokenWeb3Contract.methods["transfer(address,uint256,bytes)"](event.address, threshold, data)
-            .send({ from: OWNER, gas: 5000000 });
+          await ContractHelper.transferSetResult(token, event, cOracle, OWNER, resultIndex, threshold, OWNER);
           assert.fail();
         } catch (e) {
           SolAssert.assertRevert(e);
@@ -489,12 +478,8 @@ contract('StandardEvent', (accounts) => {
 
         // Set the result
         const setResultIndex = 3;
-        const data = '0x65f4ced1'
-          + Qweb3Utils.trimHexPrefix(cOracle.address)
-          + Qweb3Utils.trimHexPrefix(OWNER)
-          + Encoder.uintToHex(setResultIndex);
-        const tx = await tokenWeb3Contract.methods["transfer(address,uint256,bytes)"](event.address, threshold, data)
-          .send({ from: OWNER, gas: 5000000 });
+        const tx = await ContractHelper.transferSetResult(token, event, cOracle, OWNER, setResultIndex, threshold,
+          OWNER);
 
         // Get dOracle
         const dOracleAddress = Utils.paddedHexToAddress(tx.events['2'].raw.topics[2]);
@@ -506,12 +491,7 @@ contract('StandardEvent', (accounts) => {
         // Vote
         const threshold = await dOracle.consensusThreshold.call();
         const voteIndex = 1;
-        const data = '0x6f02d1fb'
-          + Qweb3Utils.trimHexPrefix(dOracle.address)
-          + Qweb3Utils.trimHexPrefix(ACCT1)
-          + Encoder.uintToHex(voteIndex);
-        const tx = await tokenWeb3Contract.methods["transfer(address,uint256,bytes)"](event.address, threshold, data)
-          .send({ from: ACCT1, gas: 5000000 });
+        const tx = await ContractHelper.transferVote(token, event, dOracle, ACCT1, voteIndex, threshold);
 
         // Validate event
         assert.equal(await event.status.call(), EventStatus.ORACLE_VOTING);
@@ -582,6 +562,102 @@ contract('StandardEvent', (accounts) => {
       const betBalances = await event.getBetBalances({ from: ACCT1 });
       SolAssert.assertBNEqual(betBalances[betResultIndex], betAmount);
       SolAssert.assertBNEqual(await event.totalBetTokens.call(), betAmount);
+    });
+  });
+
+  describe('finalizeResult()', () => {
+    const cOracleResult = 1;
+
+    beforeEach(async () => {
+      // Advance to result setting time
+      await timeMachine.increaseTime(eventParams._resultSettingStartTime - Utils.currentBlockTime());
+      assert.isAtLeast(Utils.currentBlockTime(), eventParams._resultSettingStartTime);
+      assert.isBelow(Utils.currentBlockTime(), eventParams._resultSettingEndTime);
+
+      await ContractHelper.approve(token, ORACLE, testTopic.address, cOracleThreshold);
+      await centralizedOracle.setResult(cOracleResult, { from: ORACLE });
+
+      assert.isTrue((await testTopic.oracles.call(0))[1]);
+      assert.equal((await testTopic.status.call()).toNumber(), STATUS_VOTING);
+      const finalResult = await testTopic.getFinalResult();
+      assert.equal(finalResult[0], cOracleResult);
+      assert.isFalse(finalResult[1]);
+
+      // DecentralizedOracle voting under consensusThreshold
+      decentralizedOracle = await DecentralizedOracle.at((await testTopic.oracles.call(1))[0]);
+
+      const vote1 = Utils.getBigNumberWithDecimals(20, BOT_DECIMALS);
+      await ContractHelper.approve(token, USER1, testTopic.address, vote1);
+      await decentralizedOracle.voteResult(0, vote1, { from: USER1 });
+      SolAssert.assertBNEqual((await testTopic.getVoteBalances({ from: USER1 }))[0], vote1);
+
+      const vote2 = Utils.getBigNumberWithDecimals(35, BOT_DECIMALS);
+      await ContractHelper.approve(token, USER2, testTopic.address, vote2);
+      await decentralizedOracle.voteResult(2, vote2, { from: USER2 });
+      SolAssert.assertBNEqual((await testTopic.getVoteBalances({ from: USER2 }))[2], vote2);
+
+      const vote3 = Utils.getBigNumberWithDecimals(10, BOT_DECIMALS);
+      await ContractHelper.approve(token, USER3, testTopic.address, vote3);
+      await decentralizedOracle.voteResult(0, vote3, { from: USER3 });
+      SolAssert.assertBNEqual((await testTopic.getVoteBalances({ from: USER3 }))[0], vote3);
+
+      const totalVoteBalance = cOracleThreshold.add(vote1).add(vote2).add(vote3);
+      SolAssert.assertBNEqual(await testTopic.totalBotValue.call(), totalVoteBalance);
+      SolAssert.assertBNEqual(await token.balanceOf(testTopic.address), await testTopic.totalBotValue.call());
+
+      // Advance to arbitrationEndTime
+      const arbitrationEndTime = (await decentralizedOracle.arbitrationEndTime.call()).toNumber();
+      await timeMachine.increaseTime(arbitrationEndTime - Utils.currentBlockTime());
+      assert.isAtLeast(Utils.currentBlockTime(), arbitrationEndTime);
+
+      assert.notEqual((await testTopic.status.call()).toNumber(), STATUS_COLLECTION);
+      assert.isFalse(await decentralizedOracle.finished.call());
+    });
+
+    it('finalizes the result', async () => {
+      await decentralizedOracle.finalizeResult({ from: USER1 });
+      assert.isTrue(await decentralizedOracle.finished.call());
+      assert.equal((await testTopic.status.call()).toNumber(), STATUS_COLLECTION);
+
+      const finalResult = await testTopic.getFinalResult();
+      assert.equal(finalResult[0], cOracleResult);
+      assert.isTrue(finalResult[1]);
+    });
+
+    it('throws if an invalid DecentralizedOracle tries to finalize the result', async () => {
+      const numOfResults = await testTopic.numOfResults.call();
+      const arbitrationEndTime = (await decentralizedOracle.arbitrationEndTime.call())
+        .add(await addressManager.arbitrationLength.call());
+      const threshold = Utils.getPercentageIncrease(
+        await decentralizedOracle.consensusThreshold.call(),
+        thresholdPercentIncrease,
+      );
+      const votingOracle2 = await DecentralizedOracle.new(
+        0, OWNER, testTopic.address, numOfResults,
+        cOracleResult, arbitrationEndTime, threshold, { from: OWNER },
+      );
+
+      try {
+        await votingOracle2.finalizeResult({ from: USER1 });
+        assert.fail();
+      } catch (e) {
+        SolAssert.assertRevert(e);
+      }
+
+      assert.isFalse(await votingOracle2.finished.call());
+      assert.equal((await testTopic.status.call()).toNumber(), STATUS_VOTING);
+    });
+
+    it('throws if the current status is not Status:OracleVoting', async () => {
+      await decentralizedOracle.finalizeResult({ from: USER1 });
+      assert.equal((await testTopic.status.call()).toNumber(), STATUS_COLLECTION);
+
+      try {
+        await decentralizedOracle.finalizeResult({ from: USER2 });
+        assert.fail();
+      } catch (e) {
+        SolAssert.assertRevert(e);
+      }
     });
   });
 });
