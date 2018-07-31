@@ -8,9 +8,7 @@ let addressManager;
 module.exports = async (deployer) => {
   deployer.deploy(AddressManager).then((addrMgr) => {
     addressManager = addrMgr;
-    return deployer.deploy(BodhiEthereum);
-  }).then((bodhiEth) => {
-    addressManager.setBodhiTokenAddress(BodhiEthereum.address);
+    addressManager.setBodhiTokenAddress('0x970e035e2a013cf4becd67e300d65bc32a56d826');
     return deployer.deploy(EventFactory, AddressManager.address);
   }).then((evtFactory) => {
     addressManager.setEventFactoryAddress(EventFactory.address);

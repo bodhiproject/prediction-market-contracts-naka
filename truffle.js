@@ -41,7 +41,9 @@ if (process.env.hasOwnProperty('MEW_PRIV_KEY')) {
   // Add Ropsten testnet config
   config.networks.ropsten = {
     network_id: 3,
-    provider: new WalletProvider(wallet, "https://ropsten.infura.io/jf36VtmNV1eWuSHOMvMT"),
+    provider: () => {
+      return new WalletProvider(wallet, "https://ropsten.infura.io/jf36VtmNV1eWuSHOMvMT");
+    },
     gas: 4600000,
     gasPrice: web3.utils.toWei("20", "gwei"),
   };
@@ -49,7 +51,9 @@ if (process.env.hasOwnProperty('MEW_PRIV_KEY')) {
   // Add mainnet config
   config.networks.mainnet = {
     network_id: 1,
-    provider: new WalletProvider(wallet, "https://mainnet.infura.io/jf36VtmNV1eWuSHOMvMT"),
+    provider: () => {
+      return new WalletProvider(wallet, "https://mainnet.infura.io/jf36VtmNV1eWuSHOMvMT");
+    },
     gas: 4600000,
     gasPrice: web3.utils.toWei("20", "gwei"),
   };
