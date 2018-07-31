@@ -1,6 +1,7 @@
 const Web3Beta = require('web3');
 const web3 = new Web3Beta(global.web3.currentProvider);
 const chai = require('chai');
+const bluebird = require('bluebird');
 const { each } = require('lodash');
 const Qweb3Utils = require('qweb3').Utils;
 const Encoder = require('qweb3').Encoder;
@@ -16,6 +17,7 @@ const { EventHash, EventStatus } = require('../util/constants');
 const Utils = require('../util/');
 
 const { assert } = chai;
+const ethAsync = bluebird.promisifyAll(web3.eth);
 
 const getEventParams = (oracle) => {
   const currTime = Utils.currentBlockTime();
@@ -366,6 +368,21 @@ contract('StandardEvent', (accounts) => {
           eventParams._resultNames, numOfResults, eventParams._bettingStartTime, eventParams._bettingEndTime,
           eventParams._resultSettingStartTime, eventParams._resultSettingStartTime, addressManager.address,
         );
+        assert.fail();
+      } catch (e) {
+        SolAssert.assertRevert(e);
+      }
+    });
+  });
+
+  describe('fallback function', () => {
+    it('throws upon calling', async () => {
+      try {
+        await ethAsync.sendTransactionAsync({
+          to: event.address,
+          from: OWNER,
+          value: 1,
+        });
         assert.fail();
       } catch (e) {
         SolAssert.assertRevert(e);
