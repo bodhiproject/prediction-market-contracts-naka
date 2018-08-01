@@ -567,6 +567,7 @@ contract('StandardEvent', (accounts) => {
 
   describe('finalizeResult()', () => {
     const cOracleResult = 1;
+    let dOracle;
 
     beforeEach(async () => {
       // Advance to result setting time
@@ -574,86 +575,32 @@ contract('StandardEvent', (accounts) => {
       assert.isAtLeast(Utils.currentBlockTime(), eventParams._resultSettingStartTime);
       assert.isBelow(Utils.currentBlockTime(), eventParams._resultSettingEndTime);
 
-      await ContractHelper.approve(token, ORACLE, testTopic.address, cOracleThreshold);
-      await centralizedOracle.setResult(cOracleResult, { from: ORACLE });
-
-      assert.isTrue((await testTopic.oracles.call(0))[1]);
-      assert.equal((await testTopic.status.call()).toNumber(), STATUS_VOTING);
-      const finalResult = await testTopic.getFinalResult();
-      assert.equal(finalResult[0], cOracleResult);
-      assert.isFalse(finalResult[1]);
-
-      // DecentralizedOracle voting under consensusThreshold
-      decentralizedOracle = await DecentralizedOracle.at((await testTopic.oracles.call(1))[0]);
-
-      const vote1 = Utils.getBigNumberWithDecimals(20, BOT_DECIMALS);
-      await ContractHelper.approve(token, USER1, testTopic.address, vote1);
-      await decentralizedOracle.voteResult(0, vote1, { from: USER1 });
-      SolAssert.assertBNEqual((await testTopic.getVoteBalances({ from: USER1 }))[0], vote1);
-
-      const vote2 = Utils.getBigNumberWithDecimals(35, BOT_DECIMALS);
-      await ContractHelper.approve(token, USER2, testTopic.address, vote2);
-      await decentralizedOracle.voteResult(2, vote2, { from: USER2 });
-      SolAssert.assertBNEqual((await testTopic.getVoteBalances({ from: USER2 }))[2], vote2);
-
-      const vote3 = Utils.getBigNumberWithDecimals(10, BOT_DECIMALS);
-      await ContractHelper.approve(token, USER3, testTopic.address, vote3);
-      await decentralizedOracle.voteResult(0, vote3, { from: USER3 });
-      SolAssert.assertBNEqual((await testTopic.getVoteBalances({ from: USER3 }))[0], vote3);
-
-      const totalVoteBalance = cOracleThreshold.add(vote1).add(vote2).add(vote3);
-      SolAssert.assertBNEqual(await testTopic.totalBotValue.call(), totalVoteBalance);
-      SolAssert.assertBNEqual(await token.balanceOf(testTopic.address), await testTopic.totalBotValue.call());
+      // Set the result
+      const threshold = await cOracle.consensusThreshold.call();
+      const tx = await ContractHelper.transferSetResult(token, event, cOracle, OWNER, cOracleResult, threshold, OWNER);
+      const dOracleAddress = Utils.paddedHexToAddress(tx.events['2'].raw.topics[2]);
+      dOracle = await DecentralizedOracle.at(dOracleAddress);
 
       // Advance to arbitrationEndTime
-      const arbitrationEndTime = (await decentralizedOracle.arbitrationEndTime.call()).toNumber();
+      const arbitrationEndTime = (await dOracle.arbitrationEndTime.call()).toNumber();
       await timeMachine.increaseTime(arbitrationEndTime - Utils.currentBlockTime());
       assert.isAtLeast(Utils.currentBlockTime(), arbitrationEndTime);
 
-      assert.notEqual((await testTopic.status.call()).toNumber(), STATUS_COLLECTION);
-      assert.isFalse(await decentralizedOracle.finished.call());
+      // Finalize
+      assert.equal(await event.status.call(), EventStatus.ORACLE_VOTING);
+      await event.finalizeResult(dOracle.address, { from: ACCT1 });
+      assert.equal(await event.status.call(), EventStatus.COLLECTION);
     });
 
     it('finalizes the result', async () => {
-      await decentralizedOracle.finalizeResult({ from: USER1 });
-      assert.isTrue(await decentralizedOracle.finished.call());
-      assert.equal((await testTopic.status.call()).toNumber(), STATUS_COLLECTION);
-
-      const finalResult = await testTopic.getFinalResult();
+      const finalResult = await event.getFinalResult();
       assert.equal(finalResult[0], cOracleResult);
       assert.isTrue(finalResult[1]);
     });
 
-    it('throws if an invalid DecentralizedOracle tries to finalize the result', async () => {
-      const numOfResults = await testTopic.numOfResults.call();
-      const arbitrationEndTime = (await decentralizedOracle.arbitrationEndTime.call())
-        .add(await addressManager.arbitrationLength.call());
-      const threshold = Utils.getPercentageIncrease(
-        await decentralizedOracle.consensusThreshold.call(),
-        thresholdPercentIncrease,
-      );
-      const votingOracle2 = await DecentralizedOracle.new(
-        0, OWNER, testTopic.address, numOfResults,
-        cOracleResult, arbitrationEndTime, threshold, { from: OWNER },
-      );
-
+    it('throws if the current status is not Status.OracleVoting', async () => {
       try {
-        await votingOracle2.finalizeResult({ from: USER1 });
-        assert.fail();
-      } catch (e) {
-        SolAssert.assertRevert(e);
-      }
-
-      assert.isFalse(await votingOracle2.finished.call());
-      assert.equal((await testTopic.status.call()).toNumber(), STATUS_VOTING);
-    });
-
-    it('throws if the current status is not Status:OracleVoting', async () => {
-      await decentralizedOracle.finalizeResult({ from: USER1 });
-      assert.equal((await testTopic.status.call()).toNumber(), STATUS_COLLECTION);
-
-      try {
-        await decentralizedOracle.finalizeResult({ from: USER2 });
+        await event.finalizeResult(dOracle.address, { from: ACCT1 });
         assert.fail();
       } catch (e) {
         SolAssert.assertRevert(e);
