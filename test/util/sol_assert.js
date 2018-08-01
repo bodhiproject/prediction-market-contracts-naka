@@ -11,7 +11,9 @@ module.exports = {
     assert.isAbove(error.message.search('invalid opcode'), -1, 'Invalid opcode error must be returned');
   },
   assertBNEqual(first, second) {
-    assert.equal(first.toString(), second.toString());
+    const firstBN = first.toString().split('.')[0];
+    const secondBN = second.toString().split('.')[0];
+    assert.equal(firstBN, secondBN);
   },
   assertBNNotEqual(first, second) {
     assert.notEqual(first.toString(), second.toString());

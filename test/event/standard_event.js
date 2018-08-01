@@ -14,12 +14,12 @@ const SolAssert = require('../util/sol_assert');
 const TimeMachine = require('../util/time_machine');
 const Abi = require('../util/abi');
 const { EventHash, EventStatus } = require('../util/constants');
-const Utils = require('../util/');
+const { toDenomination, bigNumberFloor, percentIncrease, currentBlockTime, paddedHexToAddress } = require('../util/');
 
 const { assert } = chai;
 
 const getEventParams = (oracle) => {
-  const currTime = Utils.currentBlockTime();
+  const currTime = currentBlockTime();
   return {
     _oracle: oracle,
     _name: ['Will Apple stock reach $300 by t', 'he end of 2017?'],
@@ -33,12 +33,13 @@ const getEventParams = (oracle) => {
 
 contract('StandardEvent', (accounts) => {
   const BET_TOKEN_DECIMALS = 18;
+  const RESULT_INVALID = 'Invalid';
   const OWNER = accounts[0];
   const ACCT1 = accounts[1];
   const ACCT2 = accounts[2];
   const ACCT3 = accounts[3];
   const ACCT4 = accounts[4];
-  const RESULT_INVALID = 'Invalid';
+  const ACCT5 = accounts[5];
   const timeMachine = new TimeMachine(web3);
 
   let addressManager;
@@ -73,9 +74,9 @@ contract('StandardEvent', (accounts) => {
     let cOracleAddress;
     each(tx.receipt.logs, (log) => {
       if (log.topics[0] === EventHash.STANDARD_EVENT_CREATED) {
-        eventAddress = Utils.paddedHexToAddress(log.topics[2]);
+        eventAddress = paddedHexToAddress(log.topics[2]);
       } else if (log.topics[0] === EventHash.CENTRALIZED_ORACLE_CREATED) {
-        cOracleAddress = Utils.paddedHexToAddress(log.topics[2]);
+        cOracleAddress = paddedHexToAddress(log.topics[2]);
       }
     });
 
@@ -406,9 +407,9 @@ contract('StandardEvent', (accounts) => {
         threshold = await cOracle.consensusThreshold.call();
 
         // Advance to result setting start time
-        await timeMachine.increaseTime(eventParams._resultSettingStartTime - Utils.currentBlockTime());
-        assert.isAtLeast(Utils.currentBlockTime(), eventParams._resultSettingStartTime);
-        assert.isBelow(Utils.currentBlockTime(), eventParams._resultSettingEndTime);
+        await timeMachine.increaseTime(eventParams._resultSettingStartTime - currentBlockTime());
+        assert.isAtLeast(currentBlockTime(), eventParams._resultSettingStartTime);
+        assert.isBelow(currentBlockTime(), eventParams._resultSettingEndTime);
       });
 
       it('calls setResult() correctly', async () => {
@@ -430,12 +431,12 @@ contract('StandardEvent', (accounts) => {
         SolAssert.assertBNEqual((await cOracle.getVoteBalances({ from: OWNER }))[resultIndex], threshold);
 
         // Validate dOracle created
-        const dOracleAddress = Utils.paddedHexToAddress(tx.events['2'].raw.topics[2]);
+        const dOracleAddress = paddedHexToAddress(tx.events['2'].raw.topics[2]);
         dOracle = await DecentralizedOracle.at(dOracleAddress);
         assert.equal(await dOracle.eventAddress.call(), event.address);
         assert.equal(await dOracle.lastResultIndex.call(), resultIndex);
         SolAssert.assertBNEqual(await dOracle.consensusThreshold.call(),
-          Utils.percentIncrease(threshold, thresholdIncrease));
+          percentIncrease(threshold, thresholdIncrease));
       });
 
       it('throws if the data length is not 76 bytes', async () => {
@@ -478,9 +479,9 @@ contract('StandardEvent', (accounts) => {
         const threshold = await cOracle.consensusThreshold.call();
 
         // Advance to result setting start time
-        await timeMachine.increaseTime(eventParams._resultSettingStartTime - Utils.currentBlockTime());
-        assert.isAtLeast(Utils.currentBlockTime(), eventParams._resultSettingStartTime);
-        assert.isBelow(Utils.currentBlockTime(), eventParams._resultSettingEndTime);
+        await timeMachine.increaseTime(eventParams._resultSettingStartTime - currentBlockTime());
+        assert.isAtLeast(currentBlockTime(), eventParams._resultSettingStartTime);
+        assert.isBelow(currentBlockTime(), eventParams._resultSettingEndTime);
 
         // Set the result
         const setResultIndex = 3;
@@ -488,7 +489,7 @@ contract('StandardEvent', (accounts) => {
           OWNER);
 
         // Get dOracle
-        const dOracleAddress = Utils.paddedHexToAddress(tx.events['2'].raw.topics[2]);
+        const dOracleAddress = paddedHexToAddress(tx.events['2'].raw.topics[2]);
         dOracle = await DecentralizedOracle.at(dOracleAddress);
         assert.equal(await dOracle.lastResultIndex.call(), setResultIndex);
       });
@@ -510,15 +511,15 @@ contract('StandardEvent', (accounts) => {
         assert.equal(await dOracle.resultIndex.call(), voteIndex);
 
         // Validate dOracle2
-        const dOracle2Address = Utils.paddedHexToAddress(tx.events['2'].raw.topics[2]);
+        const dOracle2Address = paddedHexToAddress(tx.events['2'].raw.topics[2]);
         const dOracle2 = await DecentralizedOracle.at(dOracle2Address);
         assert.equal(await dOracle2.lastResultIndex.call(), voteIndex);
         SolAssert.assertBNEqual(await dOracle2.consensusThreshold.call(),
-          Utils.percentIncrease(threshold, thresholdIncrease));
+          percentIncrease(threshold, thresholdIncrease));
       });
 
       it('throws if the data length is not 76 bytes', async () => {
-        const voteAmount = Utils.toDenomination(50, tokenDecimals);
+        const voteAmount = toDenomination(50, tokenDecimals);
         const voteIndex = 1;
         let data = '0x6f02d1fb'
           + Qweb3Utils.trimHexPrefix(dOracle.address)
@@ -542,7 +543,7 @@ contract('StandardEvent', (accounts) => {
       try {
         await tokenWeb3Contract.methods["transfer(address,uint256,bytes)"](
           event.address,
-          Utils.toDenomination(1, tokenDecimals),
+          toDenomination(1, tokenDecimals),
           '0xabcdef01'
         ).send({ from: OWNER, gas: 5000000 });
         assert.fail();
@@ -554,13 +555,13 @@ contract('StandardEvent', (accounts) => {
 
   describe('bet()', () => {
     beforeEach(async () => {
-      await timeMachine.increaseTime(eventParams._bettingStartTime - Utils.currentBlockTime());
-      assert.isAtLeast(Utils.currentBlockTime(), eventParams._bettingStartTime);
-      assert.isBelow(Utils.currentBlockTime(), eventParams._bettingEndTime);
+      await timeMachine.increaseTime(eventParams._bettingStartTime - currentBlockTime());
+      assert.isAtLeast(currentBlockTime(), eventParams._bettingStartTime);
+      assert.isBelow(currentBlockTime(), eventParams._bettingEndTime);
     });
 
     it('allows users to bet', async () => {
-      const betAmount = Utils.toDenomination(1, BET_TOKEN_DECIMALS);
+      const betAmount = toDenomination(1, BET_TOKEN_DECIMALS);
       const betResultIndex = 0;
       await event.bet(cOracle.address, betResultIndex, { from: ACCT1, value: betAmount });
 
@@ -576,20 +577,20 @@ contract('StandardEvent', (accounts) => {
 
     beforeEach(async () => {
       // Advance to result setting time
-      await timeMachine.increaseTime(eventParams._resultSettingStartTime - Utils.currentBlockTime());
-      assert.isAtLeast(Utils.currentBlockTime(), eventParams._resultSettingStartTime);
-      assert.isBelow(Utils.currentBlockTime(), eventParams._resultSettingEndTime);
+      await timeMachine.increaseTime(eventParams._resultSettingStartTime - currentBlockTime());
+      assert.isAtLeast(currentBlockTime(), eventParams._resultSettingStartTime);
+      assert.isBelow(currentBlockTime(), eventParams._resultSettingEndTime);
 
       // Set the result
       const threshold = await cOracle.consensusThreshold.call();
       const tx = await ContractHelper.transferSetResult(token, event, cOracle, OWNER, cOracleResult, threshold, OWNER);
-      const dOracleAddress = Utils.paddedHexToAddress(tx.events['2'].raw.topics[2]);
+      const dOracleAddress = paddedHexToAddress(tx.events['2'].raw.topics[2]);
       dOracle = await DecentralizedOracle.at(dOracleAddress);
 
       // Advance to arbitrationEndTime
       const arbitrationEndTime = (await dOracle.arbitrationEndTime.call()).toNumber();
-      await timeMachine.increaseTime(arbitrationEndTime - Utils.currentBlockTime());
-      assert.isAtLeast(Utils.currentBlockTime(), arbitrationEndTime);
+      await timeMachine.increaseTime(arbitrationEndTime - currentBlockTime());
+      assert.isAtLeast(currentBlockTime(), arbitrationEndTime);
 
       // Finalize
       assert.equal(await event.status.call(), EventStatus.ORACLE_VOTING);
@@ -623,30 +624,30 @@ contract('StandardEvent', (accounts) => {
 
     beforeEach(async () => {
       // Advance to betting time
-      await timeMachine.increaseTime(eventParams._bettingStartTime - Utils.currentBlockTime());
-      assert.isAtLeast(Utils.currentBlockTime(), eventParams._bettingStartTime);
-      assert.isBelow(Utils.currentBlockTime(), eventParams._bettingEndTime);
+      await timeMachine.increaseTime(eventParams._bettingStartTime - currentBlockTime());
+      assert.isAtLeast(currentBlockTime(), eventParams._bettingStartTime);
+      assert.isBelow(currentBlockTime(), eventParams._bettingEndTime);
 
       // First round of betting
-      bet1 = Utils.toDenomination(7777777777);
+      bet1 = toDenomination(7777777777);
       await event.bet(cOracle.address, 0, { from: ACCT1, value: bet1 });
       totalBetBalance = bet1;
       assert.equal(await web3.eth.getBalance(event.address), totalBetBalance);
       SolAssert.assertBNEqual((await event.getBetBalances({ from: ACCT1 }))[0], bet1);
 
-      bet2 = Utils.toDenomination(2212345678);
+      bet2 = toDenomination(2212345678);
       await event.bet(cOracle.address, 1, { from: ACCT2, value: bet2 });
       totalBetBalance = bet1.add(bet2);
       assert.equal(await web3.eth.getBalance(event.address), totalBetBalance);
       SolAssert.assertBNEqual((await event.getBetBalances({ from: ACCT2 }))[1], bet2);
 
-      bet3 = Utils.toDenomination(3027596457);
+      bet3 = toDenomination(3027596457);
       await event.bet(cOracle.address, cOracleResult, { from: ACCT3, value: bet3 });
       totalBetBalance = bet1.add(bet2).add(bet3);
       assert.equal(await web3.eth.getBalance(event.address), totalBetBalance);
       SolAssert.assertBNEqual((await event.getBetBalances({ from: ACCT3 }))[cOracleResult], bet3);
 
-      bet4 = Utils.toDenomination(1298765432);
+      bet4 = toDenomination(1298765432);
       await event.bet(cOracle.address, cOracleResult, { from: ACCT4, value: bet4 });
       totalBetBalance = bet1.add(bet2).add(bet3).add(bet4);
       assert.equal(await web3.eth.getBalance(event.address), totalBetBalance);
@@ -655,24 +656,24 @@ contract('StandardEvent', (accounts) => {
       SolAssert.assertBNEqual(await event.totalBetTokens.call(), totalBetBalance);
 
       // Advance time to result setting time
-      await timeMachine.increaseTime(eventParams._resultSettingStartTime - Utils.currentBlockTime());
-      assert.isAtLeast(Utils.currentBlockTime(), eventParams._resultSettingStartTime);
-      assert.isBelow(Utils.currentBlockTime(), eventParams._resultSettingEndTime);
+      await timeMachine.increaseTime(eventParams._resultSettingStartTime - currentBlockTime());
+      assert.isAtLeast(currentBlockTime(), eventParams._resultSettingStartTime);
+      assert.isBelow(currentBlockTime(), eventParams._resultSettingEndTime);
       
       // cOracle set result 2
       cOracleThreshold = await cOracle.consensusThreshold.call();
       const tx = await ContractHelper.transferSetResult(token, event, cOracle, OWNER, cOracleResult, cOracleThreshold);
-      const dOracleAddress = Utils.paddedHexToAddress(tx.events['2'].raw.topics[2]);
+      const dOracleAddress = paddedHexToAddress(tx.events['2'].raw.topics[2]);
       dOracle = await DecentralizedOracle.at(dOracleAddress);
     });
 
     it('transfers the tokens for a multiple betting/voting rounds', async () => {
       // dOracle1 voting hits consensusThreshold
-      const vote1a = Utils.toDenomination(61.12345678, tokenDecimals);
+      const vote1a = toDenomination(61.12345678, tokenDecimals);
       await ContractHelper.transferVote(token, event, dOracle, ACCT1, dOracle1Result, vote1a);
       SolAssert.assertBNEqual((await event.getVoteBalances({ from: ACCT1 }))[dOracle1Result], vote1a);
 
-      const vote2 = Utils.toDenomination(48.87654322, tokenDecimals);
+      const vote2 = toDenomination(48.87654322, tokenDecimals);
       let tx = await ContractHelper.transferVote(token, event, dOracle, ACCT2, dOracle1Result, vote2);
       SolAssert.assertBNEqual((await event.getVoteBalances({ from: ACCT2 }))[dOracle1Result], vote2);
 
@@ -681,20 +682,20 @@ contract('StandardEvent', (accounts) => {
       SolAssert.assertBNEqual(await token.balanceOf(event.address), totalArbitrationTokens);
 
       // Get dOracle2 instance
-      const dOracle2Address = Utils.paddedHexToAddress(tx.events['2'].raw.topics[2]);
+      const dOracle2Address = paddedHexToAddress(tx.events['2'].raw.topics[2]);
       const dOracle2 = await DecentralizedOracle.at(dOracle2Address);
       
       // DecentralizedOracle2 voting hits consensusThreshold
-      const vote3 = Utils.toDenomination(73.73737373, tokenDecimals);
+      const vote3 = toDenomination(73.73737373, tokenDecimals);
       await ContractHelper.transferVote(token, event, dOracle2, ACCT3, dOracle2Result, vote3);
       SolAssert.assertBNEqual((await event.getVoteBalances({ from: ACCT3 }))[dOracle2Result], vote3);
 
-      const vote4 = Utils.toDenomination(47.26262627, tokenDecimals);
+      const vote4 = toDenomination(47.26262627, tokenDecimals);
       tx = await ContractHelper.transferVote(token, event, dOracle2, ACCT4, dOracle2Result, vote4);
       SolAssert.assertBNEqual((await event.getVoteBalances({ from: ACCT4 }))[dOracle2Result], vote4);
 
       // Get dOracle3 instance
-      const dOracle3Address = Utils.paddedHexToAddress(tx.events['2'].raw.topics[2]);
+      const dOracle3Address = paddedHexToAddress(tx.events['2'].raw.topics[2]);
       const dOracle3 = await DecentralizedOracle.at(dOracle3Address);
 
       totalVoteBalance = totalVoteBalance.add(vote3).add(vote4);
@@ -703,14 +704,14 @@ contract('StandardEvent', (accounts) => {
       SolAssert.assertBNEqual(await token.balanceOf(event.address), totalArbitrationTokens);
 
       // dOracle3 voting under consensusThreshold
-      const vote1b = Utils.toDenomination(71.35713713, tokenDecimals);
+      const vote1b = toDenomination(71.35713713, tokenDecimals);
       await ContractHelper.transferVote(token, event, dOracle3, ACCT1, dOracle1Result, vote1b);
       SolAssert.assertBNEqual((await event.getVoteBalances({ from: ACCT1 }))[dOracle1Result], vote1a.add(vote1b));
 
       // Advance to arbitrationEndTime
       const arbitrationEndTime = (await dOracle3.arbitrationEndTime.call()).toNumber();
-      await timeMachine.increaseTime(arbitrationEndTime - Utils.currentBlockTime());
-      assert.isAtLeast(Utils.currentBlockTime(), arbitrationEndTime);
+      await timeMachine.increaseTime(arbitrationEndTime - currentBlockTime());
+      assert.isAtLeast(currentBlockTime(), arbitrationEndTime);
       
       // DecentralizedOracle finalize result
       await event.finalizeResult(dOracle3.address, { from: ACCT1 });
@@ -729,7 +730,7 @@ contract('StandardEvent', (accounts) => {
       let arbTokensWon = winningsArr[0];
       let betTokensWon = winningsArr[1];
 
-      let expectedBetTokens = Utils.toDenomination(await web3.eth.getBalance(event.address)).sub(betTokensWon);
+      let expectedBetTokens = toDenomination(await web3.eth.getBalance(event.address)).sub(betTokensWon);
       let expectedArbTokens = (await token.balanceOf(event.address)).sub(arbTokensWon);
       assert.isFalse(await event.didWithdraw.call(ACCT3));
       await event.withdrawWinnings({ from: ACCT3 });
@@ -742,7 +743,7 @@ contract('StandardEvent', (accounts) => {
       arbTokensWon = winningsArr[0];
       betTokensWon = winningsArr[1];
 
-      expectedBetTokens = Utils.toDenomination(await web3.eth.getBalance(event.address)).sub(betTokensWon);
+      expectedBetTokens = toDenomination(await web3.eth.getBalance(event.address)).sub(betTokensWon);
       expectedArbTokens = (await token.balanceOf(event.address)).sub(arbTokensWon);
       assert.isFalse(await event.didWithdraw.call(ACCT4));
       await event.withdrawWinnings({ from: ACCT4 });
@@ -755,7 +756,7 @@ contract('StandardEvent', (accounts) => {
       arbTokensWon = winningsArr[0];
       betTokensWon = winningsArr[1];
 
-      expectedBetTokens = Utils.toDenomination(await web3.eth.getBalance(event.address)).sub(betTokensWon);
+      expectedBetTokens = toDenomination(await web3.eth.getBalance(event.address)).sub(betTokensWon);
       expectedArbTokens = (await token.balanceOf(event.address)).sub(arbTokensWon);
       assert.isFalse(await event.didWithdraw.call(OWNER));
       await event.withdrawWinnings({ from: OWNER });
@@ -799,8 +800,8 @@ contract('StandardEvent', (accounts) => {
     it('throws if already withdrawn', async () => {
       // Advance to arbitrationEndTime
       const arbitrationEndTime = (await dOracle.arbitrationEndTime.call()).toNumber();
-      await timeMachine.increaseTime(arbitrationEndTime - Utils.currentBlockTime());
-      assert.isAtLeast(Utils.currentBlockTime(), arbitrationEndTime);
+      await timeMachine.increaseTime(arbitrationEndTime - currentBlockTime());
+      assert.isAtLeast(currentBlockTime(), arbitrationEndTime);
       
       // dOracle finalize result
       await event.finalizeResult(dOracle.address, { from: ACCT1 });
@@ -838,47 +839,47 @@ contract('StandardEvent', (accounts) => {
   //   describe('in Status:Collection', () => {
   //     beforeEach(async () => {
   //       // Set result
-  //       await timeMachine.increaseTime(eventParams._resultSettingStartTime - Utils.currentBlockTime());
-  //       assert.isAtLeast(Utils.currentBlockTime(), eventParams._resultSettingStartTime);
-  //       assert.isBelow(Utils.currentBlockTime(), eventParams._resultSettingEndTime);
+  //       await timeMachine.increaseTime(eventParams._resultSettingStartTime - currentBlockTime());
+  //       assert.isAtLeast(currentBlockTime(), eventParams._resultSettingStartTime);
+  //       assert.isBelow(currentBlockTime(), eventParams._resultSettingEndTime);
 
-  //       await ContractHelper.approve(token, ORACLE, testTopic.address, cOracleThreshold);
+  //       await ContractHelper.approve(token, ORACLE, event.address, cOracleThreshold);
 
   //       await centralizedOracle.setResult(0, { from: ORACLE });
-  //       assert.isTrue((await testTopic.oracles.call(0))[1]);
-  //       assert.equal((await testTopic.status.call()).toNumber(), STATUS_VOTING);
-  //       const finalResult = await testTopic.getFinalResult();
+  //       assert.isTrue((await event.oracles.call(0))[1]);
+  //       assert.equal((await event.status.call()).toNumber(), STATUS_VOTING);
+  //       const finalResult = await event.getFinalResult();
   //       assert.equal(finalResult[0], 0);
   //       assert.isFalse(finalResult[1]);
 
   //       // Finalize
-  //       decentralizedOracle = await DecentralizedOracle.at((await testTopic.oracles.call(1))[0]);
+  //       decentralizedOracle = await DecentralizedOracle.at((await event.oracles.call(1))[0]);
 
   //       const arbitrationEndTime = (await decentralizedOracle.arbitrationEndTime.call()).toNumber();
-  //       await timeMachine.increaseTime(arbitrationEndTime - Utils.currentBlockTime());
-  //       assert.isAtLeast(Utils.currentBlockTime(), arbitrationEndTime);
+  //       await timeMachine.increaseTime(arbitrationEndTime - currentBlockTime());
+  //       assert.isAtLeast(currentBlockTime(), arbitrationEndTime);
 
-  //       await decentralizedOracle.finalizeResult({ from: USER1 });
+  //       await decentralizedOracle.finalizeResult({ from: ACCT1 });
   //       assert.isTrue(await decentralizedOracle.finished.call());
-  //       assert.equal((await testTopic.status.call()).toNumber(), STATUS_COLLECTION);
+  //       assert.equal((await event.status.call()).toNumber(), STATUS_COLLECTION);
   //     });
 
   //     it('transfer the escrow to the creator', async () => {
   //       const balanceBefore = await token.balanceOf(OWNER);
   //       SolAssert.assertBNEqual(await token.balanceOf(addressManager.address), escrowAmount);
 
-  //       assert.equal(await testTopic.owner.call(), OWNER);
-  //       await testTopic.withdrawEscrow({ from: OWNER });
+  //       assert.equal(await event.owner.call(), OWNER);
+  //       await event.withdrawEscrow({ from: OWNER });
   //       SolAssert.assertBNEqual(await token.balanceOf(addressManager.address), 0);
   //       SolAssert.assertBNEqual(await token.balanceOf(OWNER), balanceBefore.add(escrowAmount));
   //     });
 
   //     it('throws if trying to withdraw escrow from non-owner address', async () => {
   //       const balanceBeforeOwner = await token.balanceOf(OWNER);
-  //       const balanceBeforeUser1 = await token.balanceOf(USER1);
+  //       const balanceBeforeUser1 = await token.balanceOf(ACCT1);
 
   //       try {
-  //         await testTopic.withdrawEscrow({ from: USER1 });
+  //         await event.withdrawEscrow({ from: ACCT1 });
   //         assert.fail();
   //       } catch (e) {
   //         SolAssert.assertRevert(e);
@@ -886,21 +887,21 @@ contract('StandardEvent', (accounts) => {
 
   //       SolAssert.assertBNEqual(await token.balanceOf(addressManager.address), escrowAmount);
   //       SolAssert.assertBNEqual(await token.balanceOf(OWNER), balanceBeforeOwner);
-  //       SolAssert.assertBNEqual(await token.balanceOf(USER1), balanceBeforeUser1);
+  //       SolAssert.assertBNEqual(await token.balanceOf(ACCT1), balanceBeforeUser1);
   //     });
 
   //     it('throws if the creator tries to withdraw escrow more than once', async () => {
   //       const balanceBefore = await token.balanceOf(OWNER);
   //       SolAssert.assertBNEqual(await token.balanceOf(addressManager.address), escrowAmount);
 
-  //       assert.equal(await testTopic.owner.call(), OWNER);
-  //       await testTopic.withdrawEscrow({ from: OWNER });
+  //       assert.equal(await event.owner.call(), OWNER);
+  //       await event.withdrawEscrow({ from: OWNER });
   //       SolAssert.assertBNEqual(await token.balanceOf(addressManager.address), 0);
   //       const balanceAfter = balanceBefore.add(escrowAmount);
   //       SolAssert.assertBNEqual(await token.balanceOf(OWNER), balanceAfter);
 
   //       try {
-  //         await testTopic.withdrawEscrow({ from: OWNER });
+  //         await event.withdrawEscrow({ from: OWNER });
   //         assert.fail();
   //       } catch (e) {
   //         SolAssert.assertRevert(e);
@@ -913,12 +914,12 @@ contract('StandardEvent', (accounts) => {
 
   //   describe('not in Status:Collection', () => {
   //     it('throws if trying to withdraw escrow not in Status:Collection', async () => {
-  //       assert.notEqual((await testTopic.status.call()).toNumber(), STATUS_COLLECTION);
+  //       assert.notEqual((await event.status.call()).toNumber(), STATUS_COLLECTION);
 
   //       const balanceBefore = await token.balanceOf(OWNER);
 
   //       try {
-  //         await testTopic.withdrawEscrow({ from: OWNER });
+  //         await event.withdrawEscrow({ from: OWNER });
   //         assert.fail();
   //       } catch (e) {
   //         SolAssert.assertRevert(e);
@@ -933,14 +934,14 @@ contract('StandardEvent', (accounts) => {
   describe('getFinalResult()', () => {
     it('returns the final resultIndex and flag if finalized', async () => {
       // Advance to result setting time
-      await timeMachine.increaseTime(eventParams._resultSettingStartTime - Utils.currentBlockTime());
-      assert.isAtLeast(Utils.currentBlockTime(), eventParams._resultSettingStartTime);
+      await timeMachine.increaseTime(eventParams._resultSettingStartTime - currentBlockTime());
+      assert.isAtLeast(currentBlockTime(), eventParams._resultSettingStartTime);
 
       // Set result
       const finalResultIndex = 1;
       const tx = await ContractHelper.transferSetResult(token, event, cOracle, OWNER, finalResultIndex,
         cOracleThreshold);
-      const dOracleAddress = Utils.paddedHexToAddress(tx.events['2'].raw.topics[2]);
+      const dOracleAddress = paddedHexToAddress(tx.events['2'].raw.topics[2]);
       dOracle = await DecentralizedOracle.at(dOracleAddress);
 
       let finalResult = await event.getFinalResult();
@@ -949,13 +950,207 @@ contract('StandardEvent', (accounts) => {
 
       // Advance to finalize time
       const arbitrationEndTime = (await dOracle.arbitrationEndTime.call()).toNumber();
-      await timeMachine.increaseTime(arbitrationEndTime - Utils.currentBlockTime());
-      assert.isAtLeast(Utils.currentBlockTime(), arbitrationEndTime);
+      await timeMachine.increaseTime(arbitrationEndTime - currentBlockTime());
+      assert.isAtLeast(currentBlockTime(), arbitrationEndTime);
       await event.finalizeResult(dOracle.address);
 
       finalResult = await event.getFinalResult();
       assert.equal(finalResult[0], finalResultIndex);
       assert.isTrue(finalResult[1]);
+    });
+  });
+
+  describe('calculateWinnings', () => {
+    const cOracleResult = 2;
+
+    it('returns the correct amounts for multiple rounds', async () => {
+      const dOracle1Result = 0;
+      const dOracle2Result = 2;
+      let totalBets;
+      let totalVotes;
+
+      // Advance to betting time
+      await timeMachine.increaseTime(eventParams._bettingStartTime - currentBlockTime());
+      assert.isAtLeast(currentBlockTime(), eventParams._bettingStartTime);
+      assert.isBelow(currentBlockTime(), eventParams._bettingEndTime);
+
+      // First round of betting
+      bet1 = toDenomination(12.3456789, BET_TOKEN_DECIMALS);
+      await event.bet(cOracle.address, 0, { from: ACCT1, value: bet1 });
+      totalBets = bet1;
+      SolAssert.assertBNEqual(toDenomination(await web3.eth.getBalance(event.address)), totalBets);
+
+      bet2 = toDenomination(23.45678901, BET_TOKEN_DECIMALS);
+      await event.bet(cOracle.address, 1, { from: ACCT2, value: bet2 });
+      totalBets = bet1.add(bet2);
+      SolAssert.assertBNEqual(toDenomination(await web3.eth.getBalance(event.address)), totalBets);
+
+      bet3 = toDenomination(30.47682524, BET_TOKEN_DECIMALS);
+      await event.bet(cOracle.address, cOracleResult, { from: ACCT3, value: bet3 });
+      totalBets = bet1.add(bet2).add(bet3);
+      SolAssert.assertBNEqual(toDenomination(await web3.eth.getBalance(event.address)), totalBets);
+
+      bet4 = toDenomination(12.18956777, BET_TOKEN_DECIMALS);
+      await event.bet(cOracle.address, cOracleResult, { from: ACCT4, value: bet4 });
+      totalBets = bet1.add(bet2).add(bet3).add(bet4);
+      SolAssert.assertBNEqual(toDenomination(await web3.eth.getBalance(event.address)), totalBets);
+
+      SolAssert.assertBNEqual(await event.totalBetTokens.call(), totalBets);
+
+      // Advance to result setting time
+      await timeMachine.increaseTime(eventParams._resultSettingStartTime - currentBlockTime());
+      assert.isAtLeast(currentBlockTime(), eventParams._resultSettingStartTime);
+
+      // Set result 2
+      let tx = await ContractHelper.transferSetResult(token, event, cOracle, OWNER, cOracleResult, cOracleThreshold);
+      const dOracleAddress = paddedHexToAddress(tx.events['2'].raw.topics[2]);
+      dOracle = await DecentralizedOracle.at(dOracleAddress);
+
+      totalVotes = cOracleThreshold;
+      SolAssert.assertBNEqual(await event.totalArbitrationTokens.call(), totalVotes);
+      assert.equal((await event.getFinalResult())[0], cOracleResult);
+
+      // dOracle1 voting. Threshold hits and result becomes 0.
+      const vote1a = toDenomination(60.12345678, tokenDecimals);
+      await ContractHelper.transferVote(token, event, dOracle, ACCT1, dOracle1Result, vote1a);
+      SolAssert.assertBNEqual((await event.getVoteBalances({ from: ACCT1 }))[dOracle1Result], vote1a);
+
+      const vote2a = toDenomination(49.87654322, tokenDecimals);
+      tx = await ContractHelper.transferVote(token, event, dOracle, ACCT2, dOracle1Result, vote2a);
+      SolAssert.assertBNEqual((await event.getVoteBalances({ from: ACCT2 }))[dOracle1Result], vote2a);
+
+      totalVotes = totalVotes.add(vote1a).add(vote2a);
+      SolAssert.assertBNEqual(await event.totalArbitrationTokens.call(), totalVotes);
+      assert.equal((await event.getFinalResult())[0], dOracle1Result);
+
+      // Get dOracle2
+      const dOracle2Address = paddedHexToAddress(tx.events['2'].raw.topics[2]);
+      const dOracle2 = await DecentralizedOracle.at(dOracle2Address);
+
+      // dOracle2 voting. Threshold hits and result becomes 2.
+      const vote3a = toDenomination(30.12345678, tokenDecimals);
+      await ContractHelper.transferVote(token, event, dOracle2, ACCT3, dOracle2Result, vote3a);
+      SolAssert.assertBNEqual((await event.getVoteBalances({ from: ACCT3 }))[dOracle2Result], vote3a);
+
+      const vote4a = toDenomination(40.87654321, tokenDecimals);
+      await ContractHelper.transferVote(token, event, dOracle2, ACCT4, dOracle2Result, vote4a);
+      SolAssert.assertBNEqual((await event.getVoteBalances({ from: ACCT4 }))[dOracle2Result], vote4a);
+
+      const vote5a = toDenomination(50.00000001, tokenDecimals);
+      tx = await ContractHelper.transferVote(token, event, dOracle2, ACCT5, dOracle2Result, vote5a);
+      SolAssert.assertBNEqual((await event.getVoteBalances({ from: ACCT5 }))[dOracle2Result], vote5a);
+
+      totalVotes = totalVotes.add(vote3a).add(vote4a).add(vote5a);
+      SolAssert.assertBNEqual(await event.totalArbitrationTokens.call(), totalVotes);
+      assert.equal((await event.getFinalResult())[0], dOracle2Result);
+
+      // Get dOracle3
+      const dOracle3Address = paddedHexToAddress(tx.events['2'].raw.topics[2]);
+      const dOracle3 = await DecentralizedOracle.at(dOracle3Address);
+
+      // dOracle3 voting. Does not his threshold and result gets finalized to 2.
+      const vote1b = toDenomination(53.77777777, tokenDecimals);
+      await ContractHelper.transferVote(token, event, dOracle3, ACCT1, dOracle1Result, vote1b);
+      const totalVote1 = vote1a.add(vote1b);
+      SolAssert.assertBNEqual((await event.getVoteBalances({ from: ACCT1 }))[dOracle1Result], totalVote1);
+
+      const vote2b = toDenomination(49.55555555, tokenDecimals);
+      await ContractHelper.transferVote(token, event, dOracle3, ACCT2, dOracle1Result, vote2b);
+      const totalVote2 = vote2a.add(vote2b);
+      SolAssert.assertBNEqual((await event.getVoteBalances({ from: ACCT2 }))[dOracle1Result], totalVote2);
+
+      // Advance to finalize time
+      const arbitrationEndTime = (await dOracle3.arbitrationEndTime.call()).toNumber();
+      await timeMachine.increaseTime(arbitrationEndTime - currentBlockTime());
+      assert.isAtLeast(currentBlockTime(), arbitrationEndTime);
+      
+      // Finalize result 2
+      await event.finalizeResult(dOracle3.address);
+      assert.equal(await event.status.call(), EventStatus.COLLECTION);
+      const finalResult = await event.getFinalResult();
+      assert.equal(finalResult[0], dOracle2Result);
+      assert.isTrue(finalResult[1]);
+
+      // Withdraw winnings: ACCT3, ACCT4, ACCT5, ORACLE
+      const percentCut = await event.ARBITRATION_REWARD_PERCENTAGE.call();
+      let losersBetTokens = bet1.add(bet2);
+      const winnersBetTokens = bet3.add(bet4);
+      const rewardBetTokens = bigNumberFloor(losersBetTokens.mul(percentCut).div(100));
+      losersBetTokens = losersBetTokens.sub(rewardBetTokens);
+      const losersArbTokens = vote1a.add(vote2a).add(vote1b).add(vote2b);
+      const winnersArbTokens = cOracleThreshold.add(vote3a).add(vote4a).add(vote5a);
+
+      // ACCT3 winner
+      let votes = vote3a;
+      let expectedArbTokens = bigNumberFloor(votes.mul(losersArbTokens).div(winnersArbTokens).add(votes));
+      let winnerBetTokenReward = bigNumberFloor(votes.mul(rewardBetTokens).div(winnersArbTokens));
+
+      let bets = bet3;
+      let expectedBetTokens = bigNumberFloor(bets.mul(losersBetTokens).div(winnersBetTokens).add(bets));
+      expectedBetTokens = expectedBetTokens.add(winnerBetTokenReward);
+
+      let winningsArr = await event.calculateWinnings({ from: ACCT3 });
+      SolAssert.assertBNEqual(winningsArr[0], expectedArbTokens);
+      SolAssert.assertBNEqual(winningsArr[1], expectedBetTokens);
+
+      // ACCT4 winner
+      votes = vote4a;
+      expectedArbTokens = bigNumberFloor(votes.mul(losersArbTokens).div(winnersArbTokens).add(votes));
+      winnerBetTokenReward = bigNumberFloor(votes.mul(rewardBetTokens).div(winnersArbTokens));
+
+      bets = bet4;
+      expectedBetTokens = bigNumberFloor(bets.mul(losersBetTokens).div(winnersBetTokens).add(bets));
+      expectedBetTokens = expectedBetTokens.add(winnerBetTokenReward);
+
+      winningsArr = await event.calculateWinnings({ from: ACCT4 });
+      SolAssert.assertBNEqual(winningsArr[0], expectedArbTokens);
+      SolAssert.assertBNEqual(winningsArr[1], expectedBetTokens);
+
+      // ACCT5 winner
+      votes = vote5a;
+      expectedArbTokens = bigNumberFloor(votes.mul(losersArbTokens).div(winnersArbTokens).add(votes));
+      winnerBetTokenReward = bigNumberFloor(votes.mul(rewardBetTokens).div(winnersArbTokens));
+
+      bets = toDenomination(0);
+      expectedBetTokens = bigNumberFloor(bets.mul(losersBetTokens).div(winnersBetTokens).add(bets));
+      expectedBetTokens = expectedBetTokens.add(winnerBetTokenReward);
+
+      winningsArr = await event.calculateWinnings({ from: ACCT5 });
+      SolAssert.assertBNEqual(winningsArr[0], expectedArbTokens);
+      SolAssert.assertBNEqual(winningsArr[1], expectedBetTokens);
+
+      // CentralizedOracle winner
+      votes = cOracleThreshold;
+      expectedArbTokens = bigNumberFloor(votes.mul(losersArbTokens).div(winnersArbTokens).add(votes));
+      winnerBetTokenReward = bigNumberFloor(votes.mul(rewardBetTokens).div(winnersArbTokens));
+
+      bets = toDenomination(0);
+      expectedBetTokens = bigNumberFloor(bets.mul(losersBetTokens).div(winnersBetTokens).add(bets));
+      expectedBetTokens = expectedBetTokens.add(winnerBetTokenReward);
+
+      winningsArr = await event.calculateWinnings({ from: OWNER });
+      SolAssert.assertBNEqual(winningsArr[0], expectedArbTokens);
+      SolAssert.assertBNEqual(winningsArr[1], expectedBetTokens);
+
+      // ACCT1 loser
+      winningsArr = await event.calculateWinnings({ from: ACCT1 });
+      SolAssert.assertBNEqual(winningsArr[0], 0);
+      SolAssert.assertBNEqual(winningsArr[1], 0);
+
+      // ACCT2 loser
+      winningsArr = await event.calculateWinnings({ from: ACCT2 });
+      SolAssert.assertBNEqual(winningsArr[0], 0);
+      SolAssert.assertBNEqual(winningsArr[1], 0);
+    });
+
+    it('throws if status is not Status.Collection', async () => {
+      assert.notEqual(await event.status.call(), EventStatus.COLLECTION);
+      try {
+        await event.calculateWinnings({ from: ACCT3 });
+        assert.fail();
+      } catch (e) {
+        SolAssert.assertRevert(e);
+      }
     });
   });
 });

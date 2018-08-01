@@ -9,7 +9,18 @@ module.exports = class Utils {
   * @retun {BigNumber} The converted BigNumber.
   */
   static toDenomination(number, decimals = 0) {
-    return web3.toBigNumber(number * (10 ** decimals));
+    const bn = web3.toBigNumber(number);
+    const decimalsBn = web3.toBigNumber(10 ** decimals);
+    return bn.times(decimalsBn);
+  }
+
+  /*
+  * Truncates the decimals off the BigNumber and returns a new BigNumber.
+  * @param number {BigNumber} The number to truncate.
+  * @retun {BigNumber} The truncated BigNumber.
+  */
+  static bigNumberFloor(bigNumber) {
+    return web3.toBigNumber(bigNumber.toString().split('.')[0]);
   }
 
   /*
