@@ -10,10 +10,9 @@ import "../token/ERC223ReceivingContract.sol";
 import "../lib/Ownable.sol";
 import "../lib/SafeMath.sol";
 import "../lib/ByteUtils.sol";
-import "bytes/BytesLib.sol";
 
-contract StandardEvent is BaseContract, Ownable {
-    using BytesLib for bytes;
+contract StandardEvent is ERC223ReceivingContract, BaseContract, Ownable {
+    using ByteUtils for bytes;
     using ByteUtils for bytes32;
     using SafeMath for uint256;
 
@@ -117,18 +116,21 @@ contract StandardEvent is BaseContract, Ownable {
     /// @param _value Amount of tokens.
     /// @param _data The message data. First 4 bytes is function hash & rest is function params.
     function tokenFallback(address _from, uint _value, bytes _data) external {
-        bytes memory functionId = _data.slice(0, 4);
         bytes memory setResultFunc = hex"65f4ced1";
         bytes memory voteFunc = hex"6f02d1fb";
 
-        address centralizedOracle = _data.toAddress(4);
-        address resultSetter = _data.toAddress(24);
-        uint8 resultIndex = uint8(_data.toUint(44));
+        bytes memory funcHash = _data.sliceBytes(0, 4);
+        address centralizedOracle = _data.sliceAddress(4);
+        address user = _data.sliceAddress(24);
+        uint8 resultIndex = uint8(_data.sliceUint(44));
 
-        if (functionId.equal(setResultFunc)) {
-            setResult(centralizedOracle, resultSetter, resultIndex, _value);
-        } else if (functionId.equal(voteFunc)) {
-            vote(centralizedOracle, resultSetter, resultIndex, _value);
+        bytes32 encodedFunc = keccak256(abi.encodePacked(funcHash));
+        if (encodedFunc == keccak256(abi.encodePacked(setResultFunc))) {
+            assert(_data.length == 76);
+            setResult(centralizedOracle, user, resultIndex, _value);
+        } else if (encodedFunc == keccak256(abi.encodePacked(voteFunc))) {
+            assert(_data.length == 76);
+            vote(centralizedOracle, user, resultIndex, _value);
         } else {
             revert("Unhandled function in tokenFallback");
         }

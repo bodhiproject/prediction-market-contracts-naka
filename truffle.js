@@ -14,6 +14,11 @@ const config = {
       port: 8546,
       network_id: "*",
     },
+    ganache: {
+      host: "localhost",
+      port: 7545,
+      network_id: "*",
+    },
   },
   solc: {
     optimizer: {
@@ -36,17 +41,21 @@ if (process.env.hasOwnProperty('MEW_PRIV_KEY')) {
   // Add Ropsten testnet config
   config.networks.ropsten = {
     network_id: 3,
-    provider: new WalletProvider(wallet, "https://ropsten.infura.io/jf36VtmNV1eWuSHOMvMT"),
+    provider: () => {
+      return new WalletProvider(wallet, "https://ropsten.infura.io/jf36VtmNV1eWuSHOMvMT");
+    },
     gas: 4600000,
-    gasPrice: web3.toWei("20", "gwei"),
+    gasPrice: web3.utils.toWei("20", "gwei"),
   };
 
   // Add mainnet config
   config.networks.mainnet = {
     network_id: 1,
-    provider: new WalletProvider(wallet, "https://mainnet.infura.io/jf36VtmNV1eWuSHOMvMT"),
+    provider: () => {
+      return new WalletProvider(wallet, "https://mainnet.infura.io/jf36VtmNV1eWuSHOMvMT");
+    },
     gas: 4600000,
-    gasPrice: web3.toWei("20", "gwei"),
+    gasPrice: web3.utils.toWei("20", "gwei"),
   };
 }
 

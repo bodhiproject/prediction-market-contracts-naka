@@ -2,7 +2,7 @@ const assert = require('chai').assert;
 
 const BodhiEthereum = artifacts.require('./token/BodhiEthereum.sol');
 const BlockHeightManager = require('../util/block_height_manager');
-const Utils = require('../util/utils');
+const Utils = require('../util/');
 const SolAssert = require('../util/sol_assert');
 
 contract('BodhiEthereum', (accounts) => {
@@ -25,7 +25,7 @@ contract('BodhiEthereum', (accounts) => {
       assert.equal(await token.owner.call(), OWNER);
 
       const tokenTotalSupply = await token.tokenTotalSupply.call();
-      const expectedTokenTotalSupply = Utils.getBigNumberWithDecimals(100e6, decimals);
+      const expectedTokenTotalSupply = Utils.toDenomination(100e6, decimals);
       assert.equal(tokenTotalSupply.toString(), expectedTokenTotalSupply.toString());
     });
   });

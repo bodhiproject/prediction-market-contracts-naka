@@ -11,7 +11,10 @@
     "chai": "^4.1.2",
     "dotenv": "^5.0.1",
     "ethereumjs-wallet": "^0.6.0",
-    "truffle-wallet-provider": "0.0.5"
+    "lodash": "^4.17.10",
+    "qweb3": "^0.8.2",
+    "truffle-wallet-provider": "0.0.5",
+    "web3": "^1.0.0-beta.35"
   },
   "devDependencies": {},
   "scripts": {
