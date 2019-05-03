@@ -2,28 +2,20 @@ pragma solidity ^0.5.8;
 
 import "./IAddressManager.sol";
 import "../lib/Ownable.sol";
-import "../token/ERC20.sol";
 
 contract AddressManager is IAddressManager, Ownable {
-    uint256 public constant tokenDecimals = 8;
+    uint256 private constant _tokenDecimals = 8;
 
-    uint16 public currentEventFactoryIndex = 0; // Version of the next upgraded EventFactory contract
-    uint16 public currentOracleFactoryIndex = 0; // Version of the next upgraded OracleFactory contract
-    uint256 public eventEscrowAmount = 100 * (10 ** tokenDecimals); // Amount of escrow deposit needed to create an event
-    uint256 public arbitrationLength = 86400; // Number of seconds for arbitration period
-    uint256 public startingOracleThreshold = 100 * (10 ** tokenDecimals); // Consensus threshold for CentralizedOracles
-    uint256 public thresholdPercentIncrease = 10; // Percentage to increase the Consensus Threshold every round
-    mapping(address => uint16) public eventFactoryAddressToVersion;
-    mapping(address => uint16) public oracleFactoryAddressToVersion;
+    uint256 private _eventEscrowAmount = 100 * (10 ** _tokenDecimals);
+    uint256 private _arbitrationLength = 86400;
+    uint256 private _startingOracleThreshold = 100 * (10 ** _tokenDecimals);
+    uint256 private _thresholdPercentIncrease = 10;
     mapping(address => bool) private whitelistedContracts;
 
     // Events
-    event BodhiTokenAddressChanged(address indexed _newAddress);
-    event EventFactoryAddressAdded(uint16 _index, address indexed _contractAddress);
-    event OracleFactoryAddressAdded(uint16 _index, address indexed _contractAddress);
-    event EscrowDeposited(address indexed _depositer, uint256 escrowAmount);
-    event EscrowWithdrawn(address indexed _eventAddress, address indexed _depositer, uint256 escrowAmount);
-    event ContractWhitelisted(address indexed _contractAddress);
+    event EventFactoryChanged(address indexed oldAddress, address indexed newAddress);
+    event OracleFactoryChanged(address indexed oldAddress, address indexed newAddress);
+    event ContractWhitelisted(address indexed contractAddress);
 
     // Modifiers
     modifier isWhitelisted(address _contractAddress) {
@@ -34,132 +26,94 @@ contract AddressManager is IAddressManager, Ownable {
     constructor() Ownable(msg.sender) public {
     }
 
-    /// @notice Transfer the escrow amount needed to create an Event.
-    /// @param _creator The address of the creator.
-    function transferEscrow(address _creator) external isWhitelisted(msg.sender) {
-        ERC20 token = ERC20(bodhiTokenAddress);
-        require(token.allowance(_creator, address(this)) >= eventEscrowAmount);
-
-        token.transferFrom(_creator, address(this), eventEscrowAmount);
-
-        emit EscrowDeposited(_creator, eventEscrowAmount);
-    }
-
-    /// @notice Withdraws the escrow for an Event.
-    /// @param _creator The address of the creator.
-    function withdrawEscrow(address _creator, uint256 _escrowAmount) external isWhitelisted(msg.sender) {
-        ERC20(bodhiTokenAddress).transfer(_creator, _escrowAmount);
-
-        emit EscrowWithdrawn(msg.sender, _creator, _escrowAmount);
-    }
-
     /// @dev Adds a whitelisted contract address. Only allowed to be called from previously whitelisted addresses.
-    /// @param _contractAddress The address of the contract to whitelist.
-    function addWhitelistContract(address _contractAddress)
+    /// @param contractAddress The address of the contract to whitelist.
+    function addWhitelistContract(
+        address contractAddress)
         external
+        onlyOwner
         isWhitelisted(msg.sender)
-        validAddress(_contractAddress)
+        validAddress(contractAddress)
     {
-        whitelistedContracts[_contractAddress] = true;
+        whitelistedContracts[contractAddress] = true;
 
-        emit ContractWhitelisted(_contractAddress);
-    }
-
-    /// @dev Allows the owner to set the address of the Bodhi Token contract.
-    /// @param _tokenAddress The address of the Bodhi Token contract.
-    function setBodhiTokenAddress(address _tokenAddress) public onlyOwner() validAddress(_tokenAddress) {
-        bodhiTokenAddress = _tokenAddress;
-        whitelistedContracts[_tokenAddress] = true;
-
-        emit BodhiTokenAddressChanged(bodhiTokenAddress);
-        emit ContractWhitelisted(_tokenAddress);
+        emit ContractWhitelisted(contractAddress);
     }
 
     /// @dev Allows the owner to set the address of an EventFactory contract.
-    /// @param _contractAddress The address of the EventFactory contract.
-    function setEventFactoryAddress(address _contractAddress) public onlyOwner() validAddress(_contractAddress) {
+    /// @param contractAddress The address of the EventFactory contract.
+    function setEventFactoryAddress(
+        address contractAddress)
+        external
+        onlyOwner
+        validAddress(contractAddress) 
+    {
         uint16 index = currentEventFactoryIndex;
-        eventFactoryVersionToAddress[index] = _contractAddress;
-        eventFactoryAddressToVersion[_contractAddress] = index;
+        eventFactoryVersionToAddress[index] = contractAddress;
+        eventFactoryAddressToVersion[contractAddress] = index;
         currentEventFactoryIndex++;
 
-        whitelistedContracts[_contractAddress] = true;
+        whitelistedContracts[contractAddress] = true;
 
-        emit EventFactoryAddressAdded(index, _contractAddress);
-        emit ContractWhitelisted(_contractAddress);
+        emit EventFactoryAddressAdded(index, contractAddress);
+        emit ContractWhitelisted(contractAddress);
     }
 
-    /// @dev Allows the owner to set the version of the next EventFactory.
-    ///      In case AddressManager ever gets upgraded, we need to be able to continue where the last version was.
-    /// @param _newIndex The index of where the next EventFactory version should start.
-    function setCurrentEventFactoryIndex(uint16 _newIndex) public onlyOwner() {
-        currentEventFactoryIndex = _newIndex;
+    /// @dev Sets the escrow amount that is needed to create an Event.
+    /// @param newAmount The new escrow amount needed to create an Event.
+    function setEventEscrowAmount(
+        uint256 newAmount)
+        external
+        onlyOwner
+    {
+        eventEscrowAmount = newAmount;
     }
 
-    /// @dev Allows the owner to set the address of an OracleFactory contract.
-    /// @param _contractAddress The address of the OracleFactory contract.
-    function setOracleFactoryAddress(address _contractAddress) public onlyOwner() validAddress(_contractAddress) {
-        uint16 index = currentOracleFactoryIndex;
-        oracleFactoryVersionToAddress[index] = _contractAddress;
-        oracleFactoryAddressToVersion[_contractAddress] = index;
-        currentOracleFactoryIndex++;
+    /// @dev Sets the arbitration length.
+    /// @param newLength The new length in seconds (unix time) of an arbitration period.
+    function setArbitrationLength(
+        uint256 newLength)
+        external
+        onlyOwner
+    {   
+        require(newLength > 0);
 
-        whitelistedContracts[_contractAddress] = true;
-
-        emit OracleFactoryAddressAdded(index, _contractAddress);
-        emit ContractWhitelisted(_contractAddress);
+        arbitrationLength = newLength;
     }
 
-    /// @dev Allows the owner to set the version of the next OracleFactory.
-    ///      In case AddressManager ever gets upgraded, we need to be able to continue where the last version was.
-    /// @param _newIndex The index of where the next OracleFactory version should start.
-    function setCurrentOracleFactoryIndex(uint16 _newIndex) public onlyOwner() {
-        currentOracleFactoryIndex = _newIndex;
+    /// @dev Sets the starting betting threshold.
+    /// @param newThreshold The new consensus threshold for the betting round.
+    function setStartingOracleThreshold(
+        uint256 newThreshold)
+        external
+        onlyOwner
+    {
+        startingOracleThreshold = newThreshold;
     }
 
-    /// @dev Sets the eventEscrowAmount that is needed to create an Event.
-    /// @param _newEscrowAmount The new escrow amount needed to create an Event.
-    function setEventEscrowAmount(uint256 _newEscrowAmount) public onlyOwner() {
-        eventEscrowAmount = _newEscrowAmount;
+    /// @dev Sets the threshold percentage increase.
+    /// @param newPercentage The new percentage increase for each new round.
+    function setConsensusThresholdPercentIncrease(
+        uint256 newPercentage)
+        external
+        onlyOwner
+    {
+        thresholdPercentIncrease = newPercentage;
     }
 
-    /// @dev Sets the arbitrationLength that DecentralizedOracles will use.
-    /// @param _newLength The new length in seconds (unix time) of an arbitration period.
-    function setArbitrationLength(uint256 _newLength) public onlyOwner() {   
-        require(_newLength > 0);
-
-        arbitrationLength = _newLength;
+    function eventEscrowAmount() external view returns (uint256) {
+        return _eventEscrowAmount;
     }
 
-    /// @dev Sets the startingOracleThreshold that CentralizedOracles will use.
-    /// @param _newThreshold The new consensusThreshold for CentralizedOracles.
-    function setStartingOracleThreshold(uint256 _newThreshold) public onlyOwner() {   
-        startingOracleThreshold = _newThreshold;
+    function arbitrationLength() external view returns (uint256) {
+        return _arbitrationLength;
     }
 
-    /// @dev Sets the thresholdPercentIncrease that DecentralizedOracles will use.
-    /// @param _newPercentage The new increment amount for DecentralizedOracles.
-    function setConsensusThresholdPercentIncrease(uint256 _newPercentage) public onlyOwner() {   
-        thresholdPercentIncrease = _newPercentage;
+    function startingOracleThreshold() external view returns (uint256) {
+        return _startingOracleThreshold;
     }
 
-    /// @notice Gets the latest index of a deployed EventFactory contract.
-    /// @return The index of the latest deployed EventFactory contract.
-    function getLastEventFactoryIndex() public view returns (uint16 lastEventFactoryIndex) {
-        if (currentEventFactoryIndex == 0) {
-            return 0;
-        } else {
-            return currentEventFactoryIndex - 1;
-        }
-    }
-
-    /// @notice Gets the latest index of a deployed OracleFactory contract.
-    /// @return The index of the latest deployed OracleFactory contract.
-    function getLastOracleFactoryIndex() public view returns (uint16 lastOracleFactoryIndex) {
-        if (currentOracleFactoryIndex == 0) {
-            return 0;
-        } else {
-            return currentOracleFactoryIndex - 1;
-        }
+    function thresholdPercentIncrease() external view returns (uint256) {
+        return _thresholdPercentIncrease;
     }
 }
