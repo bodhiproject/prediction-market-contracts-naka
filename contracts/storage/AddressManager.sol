@@ -6,6 +6,7 @@ import "../lib/Ownable.sol";
 contract AddressManager is IAddressManager, Ownable {
     uint256 private constant _tokenDecimals = 8;
 
+    address private _eventFactoryAddress;
     uint256 private _eventEscrowAmount = 100 * (10 ** _tokenDecimals);
     uint256 private _arbitrationLength = 86400;
     uint256 private _startingOracleThreshold = 100 * (10 ** _tokenDecimals);
@@ -14,7 +15,6 @@ contract AddressManager is IAddressManager, Ownable {
 
     // Events
     event EventFactoryChanged(address indexed oldAddress, address indexed newAddress);
-    event OracleFactoryChanged(address indexed oldAddress, address indexed newAddress);
     event ContractWhitelisted(address indexed contractAddress);
 
     // Modifiers
@@ -42,20 +42,17 @@ contract AddressManager is IAddressManager, Ownable {
 
     /// @dev Allows the owner to set the address of an EventFactory contract.
     /// @param contractAddress The address of the EventFactory contract.
-    function setEventFactoryAddress(
+    function setEventFactory(
         address contractAddress)
         external
         onlyOwner
         validAddress(contractAddress) 
     {
-        uint16 index = currentEventFactoryIndex;
-        eventFactoryVersionToAddress[index] = contractAddress;
-        eventFactoryAddressToVersion[contractAddress] = index;
-        currentEventFactoryIndex++;
-
+        address oldAddress = _eventFactoryAddress;
+        _eventFactoryAddress = contractAddress;
         whitelistedContracts[contractAddress] = true;
 
-        emit EventFactoryAddressAdded(index, contractAddress);
+        emit EventFactoryChanged(oldAddress, _eventFactoryAddress);
         emit ContractWhitelisted(contractAddress);
     }
 
@@ -77,7 +74,6 @@ contract AddressManager is IAddressManager, Ownable {
         onlyOwner
     {   
         require(newLength > 0);
-
         arbitrationLength = newLength;
     }
 
