@@ -8,7 +8,7 @@ contract ConfigManager is IAddressManager, Ownable {
 
     address private _eventFactoryAddress;
     uint256 private _eventEscrowAmount = 100 * (10 ** _tokenDecimals);
-    uint256 private _arbitrationLength = 86400;
+    uint256 private _arbitrationLength = 24 * 60 * 60; // 1 day
     uint256 private _startingOracleThreshold = 100 * (10 ** _tokenDecimals);
     uint256 private _thresholdPercentIncrease = 10;
     mapping(address => bool) private whitelistedContracts;
