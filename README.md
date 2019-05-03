@@ -1,1 +1,1 @@
-# ethereum
+# Bodhi Prediction Market for Nakachain
