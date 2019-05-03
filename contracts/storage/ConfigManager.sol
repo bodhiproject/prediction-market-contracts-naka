@@ -1,9 +1,9 @@
 pragma solidity ^0.5.8;
 
-import "./IAddressManager.sol";
+import "./IConfigManager.sol";
 import "../lib/Ownable.sol";
 
-contract AddressManager is IAddressManager, Ownable {
+contract ConfigManager is IAddressManager, Ownable {
     uint256 private constant _tokenDecimals = 8;
 
     address private _eventFactoryAddress;
