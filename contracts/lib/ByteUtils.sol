@@ -1,4 +1,4 @@
-pragma solidity ^0.4.24;
+pragma solidity ^0.5.8;
 
 library ByteUtils {
     /// @dev Slices a bytes array based on the starting offset and length.

@@ -1,4 +1,4 @@
-pragma solidity ^0.4.24;
+pragma solidity ^0.5.8;
 
 contract ICentralizedOracle {
     function validateBet(address _bettor, uint8 _resultIndex, uint256 _amount) external returns (bool isValid);
