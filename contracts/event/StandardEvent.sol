@@ -12,11 +12,17 @@ contract StandardEvent is NRC223Receiver, Ownable {
     using ByteUtils for bytes32;
     using SafeMath for uint256;
 
+    // Represents all the bets/votes of a specific result.
     struct ResultBalance {
         uint256 totalBets;
         uint256 totalVotes;
         mapping(address => uint256) bets;
         mapping(address => uint256) votes;
+    }
+
+    // Represents the aggregated bets/votes of a round.
+    struct RoundBalances {
+        ResultBalance[11] resultBalances;
     }
 
     /// @notice Status types
@@ -41,16 +47,23 @@ contract StandardEvent is NRC223Receiver, Ownable {
     uint256 public _betEndTime;
     uint256 public _resultSetStartTime;
     uint256 public _resultSetEndTime;
-    uint256 public _totalBetTokens;
-    uint256 public _totalArbitrationTokens;
+    uint256 public _totalBetAmount;
+    uint256 public _totalVoteAmount;
     uint256 public _escrowAmount;
     uint256 public _arbitrationLength;
     uint256 public _startingOracleThreshold;
     uint256 public _thresholdPercentIncrease;
     uint256 public _arbitrationRewardPercentage;
+    RoundBalances[] private _roundBalances;
     mapping(address => bool) public _didWithdraw;
 
     // Events
+    event BetPlaced(
+        address indexed eventAddress,
+        address indexed better,
+        uint8 resultIndex,
+        uint256 amount
+    );
     event FinalResultSet(
         uint16 indexed version, 
         address indexed eventAddress, 
@@ -116,13 +129,16 @@ contract StandardEvent is NRC223Receiver, Ownable {
         _resultSetEndTime = resultSetEndTime;
         _centralizedOracle = centralizedOracle;
 
-        // Fetch current config
+        // Fetch current config and set
         IConfigManager configManager = IConfigManager(configManager);
         _escrowAmount = configManager.eventEscrowAmount();
         _arbitrationLength = configManager.arbitrationLength();
         _arbitrationRewardPercentage = configManager.arbitrationRewardPercentage();
         _startingOracleThreshold = configManager.startingOracleThreshold();
         _thresholdPercentIncrease = configManager.thresholdPercentIncrease();
+
+        // Init the Centralized Oracle
+        initCentralizedOracle();
     }
 
     /// @notice Fallback function implemented to accept native tokens for betting.
@@ -168,13 +184,13 @@ contract StandardEvent is NRC223Receiver, Ownable {
         require(msg.value > 0);
 
         // Update balances
+        _roundBalances[0].resultBalances[resultIndex].totalBets =
+            _roundBalances[0].resultBalances[resultIndex].totalBets.add(_amount);
+        _roundBalances[0].resultBalances[resultIndex].bets[msg.sender] =
+            _roundBalances[0].resultBalances[resultIndex].bets[msg.sender].add(_amount);
+        _totalBetAmount = _totalBetAmount.add(msg.value);
 
-
-        balances[_resultIndex].totalBets = balances[_resultIndex].totalBets.add(msg.value);
-        balances[_resultIndex].bets[msg.sender] = balances[_resultIndex].bets[msg.sender].add(msg.value);
-        totalBetTokens = totalBetTokens.add(msg.value);
-
-        ICentralizedOracle(_centralizedOracle).recordBet(msg.sender, _resultIndex, msg.value);
+        emit BetPlaced(address(this), msg.sender, resultIndex, msg.value);
     }
 
     /// @notice Finalizes the current result.
@@ -278,19 +294,8 @@ contract StandardEvent is NRC223Receiver, Ownable {
         return (arbitrationTokenReturn, betTokenReturn);
     }
 
-    function createCentralizedOracle(
-        address _centralizedOracle, 
-        uint256 _bettingStartTime,
-        uint256 _bettingEndTime,
-        uint256 _resultSettingStartTime,
-        uint256 _resultSettingEndTime)
-        private
-    {
-        address oracleFactory = addressManager.oracleFactoryVersionToAddress(version);
-        address newOracle = IOracleFactory(oracleFactory).createCentralizedOracle(address(this), 
-            numOfResults, _centralizedOracle, _bettingStartTime, _bettingEndTime, _resultSettingStartTime, 
-            _resultSettingEndTime, addressManager.startingOracleThreshold());
-        assert(newOracle != address(0));
+    function initCentralizedOracle() private {
+        balances.push(RoundBalances())
     }
 
     function createDecentralizedOracle(uint256 _consensusThreshold) private {
@@ -348,7 +353,7 @@ contract StandardEvent is NRC223Receiver, Ownable {
         // Update balances
         balances[_resultIndex].totalVotes = balances[_resultIndex].totalVotes.add(_amount);
         balances[_resultIndex].votes[_voter] = balances[_resultIndex].votes[_voter].add(_amount);
-        totalArbitrationTokens = totalArbitrationTokens.add(_amount);
+        _totalVoteAmount = _totalVoteAmount.add(_amount);
 
         // Set result and deploy new DecentralizedOracle if threshold hit
         bool didHitThreshold;
