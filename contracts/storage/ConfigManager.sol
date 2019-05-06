@@ -3,7 +3,7 @@ pragma solidity ^0.5.8;
 import "./IConfigManager.sol";
 import "../lib/Ownable.sol";
 
-contract ConfigManager is IAddressManager, Ownable {
+contract ConfigManager is IConfigManager, Ownable {
     uint256 private constant TOKEN_DECIMALS = 8;
 
     uint8 private _arbitrationRewardPercentage = 1;
