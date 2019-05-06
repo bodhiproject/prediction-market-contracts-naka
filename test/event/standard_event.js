@@ -604,7 +604,7 @@ contract('StandardEvent', (accounts) => {
       assert.isTrue(finalResult[1]);
     });
 
-    it('throws if the current status is not Status.OracleVoting', async () => {
+    it('throws if the current status is not Status.Arbitration', async () => {
       try {
         await event.finalizeResult(dOracle.address, { from: ACCT1 });
         assert.fail();

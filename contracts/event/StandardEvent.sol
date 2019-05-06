@@ -21,46 +21,57 @@ contract StandardEvent is NRC223Receiver, Ownable {
     }
 
     // Represents the aggregated bets/votes of a round.
-    struct RoundBalances {
+    struct EventRound {
+        uint8 lastResultIndex;
+        uint8 resultIndex;
+        uint256 consensusThreshold;
         ResultBalance[11] resultBalances;
     }
 
     /// @notice Status types
     /// Betting: Bet with the betting token during this phase.
-    /// OracleVoting: Arbitrate with the arbitration token during this phase.
+    /// Arbitration: Vote against set result with the arbitration token during this phase.
     /// Collection: Winners collect their winnings during this phase.
     enum Status {
         Betting,
-        OracleVoting,
+        Arbitration,
         Collection
     }
 
     uint16 public constant VERSION = 0;
+    uint8 public constant INVALID_RESULT_INDEX = 255;
 
-    Status public _status = Status.Betting;
-    bool public _escrowWithdrawn;
-    uint8 public _numOfResults;
-    bytes32[10] public _eventName;
-    bytes32[11] public _eventResults;
-    address public _centralizedOracle;
-    uint256 public _betStartTime;
-    uint256 public _betEndTime;
-    uint256 public _resultSetStartTime;
-    uint256 public _resultSetEndTime;
-    uint256 public _totalBetAmount;
-    uint256 public _totalVoteAmount;
-    uint256 public _escrowAmount;
-    uint256 public _arbitrationLength;
-    uint256 public _startingOracleThreshold;
-    uint256 public _thresholdPercentIncrease;
-    uint256 public _arbitrationRewardPercentage;
-    RoundBalances[] private _roundBalances;
-    mapping(address => bool) public _didWithdraw;
+    Status private _status = Status.Betting;
+    bool private _escrowWithdrawn;
+    uint8 private _numOfResults;
+    uint8 private _currentRound = 0;
+    uint8 private _currentResultIndex;
+    bytes32[10] private _eventName;
+    bytes32[11] private _eventResults;
+    address private _centralizedOracle;
+    uint256 private _betStartTime;
+    uint256 private _betEndTime;
+    uint256 private _resultSetStartTime;
+    uint256 private _resultSetEndTime;
+    uint256 private _totalBetAmount;
+    uint256 private _totalVoteAmount;
+    uint256 private _escrowAmount;
+    uint256 private _arbitrationLength;
+    uint256 private _thresholdPercentIncrease;
+    uint256 private _arbitrationRewardPercentage;
+    EventRound[] private _eventRounds;
+    mapping(address => bool) private _didWithdraw;
 
     // Events
     event BetPlaced(
         address indexed eventAddress,
         address indexed better,
+        uint8 resultIndex,
+        uint256 amount
+    );
+    event ResultSet(
+        address indexed eventAddress,
+        address indexed centralizedOracle,
         uint8 resultIndex,
         uint256 amount
     );
@@ -77,6 +88,9 @@ contract StandardEvent is NRC223Receiver, Ownable {
     );
 
     // Modifiers
+    modifier isInBettingPhase() {
+        require(_status == Status.Betting);
+    }
     modifier validResultIndex(uint8 resultIndex) {
         require (resultIndex <= _numOfResults - 1);
         _;
@@ -134,38 +148,40 @@ contract StandardEvent is NRC223Receiver, Ownable {
         _escrowAmount = configManager.eventEscrowAmount();
         _arbitrationLength = configManager.arbitrationLength();
         _arbitrationRewardPercentage = configManager.arbitrationRewardPercentage();
-        _startingOracleThreshold = configManager.startingOracleThreshold();
         _thresholdPercentIncrease = configManager.thresholdPercentIncrease();
 
-        // Init the Centralized Oracle
-        initCentralizedOracle();
+        // Init CentralizedOracle round
+        initCentralizedOracle(configManager.startingOracleThreshold());
     }
 
     /// @notice Fallback function implemented to accept native tokens for betting.
     function() external payable {}
 
     /// @dev Standard NRC223 function that will handle incoming token transfers.
-    /// @param _from Token sender address.
-    /// @param _value Amount of tokens.
-    /// @param _data The message data. First 4 bytes is function hash & rest is function params.
-    function tokenFallback(address _from, uint _value, bytes _data) external {
+    /// @param from Token sender address.
+    /// @param value Amount of tokens.
+    /// @param data The message data. First 4 bytes is function hash & rest is function params.
+    function tokenFallback(
+        address from,
+        uint value,
+        bytes data)
+        external
+    {
         // TODO: check token address and make sure NBOT is accepted only
 
         bytes memory setResultFunc = hex"65f4ced1";
         bytes memory voteFunc = hex"6f02d1fb";
 
-        bytes memory funcHash = _data.sliceBytes(0, 4);
-        address centralizedOracle = _data.sliceAddress(4);
-        address user = _data.sliceAddress(24);
-        uint8 resultIndex = uint8(_data.sliceUint(44));
+        bytes memory funcHash = data.sliceBytes(0, 4);
+        uint8 resultIndex = uint8(data.sliceUint(4));
 
         bytes32 encodedFunc = keccak256(abi.encodePacked(funcHash));
         if (encodedFunc == keccak256(abi.encodePacked(setResultFunc))) {
-            assert(_data.length == 76);
-            setResult(centralizedOracle, user, resultIndex, _value);
+            assert(_data.length == 36);
+            setResult(from, resultIndex, value);
         } else if (encodedFunc == keccak256(abi.encodePacked(voteFunc))) {
-            assert(_data.length == 76);
-            vote(centralizedOracle, user, resultIndex, _value);
+            assert(_data.length == 36);
+            vote(from, resultIndex, _value);
         } else {
             revert("Unhandled function in tokenFallback");
         }
@@ -177,6 +193,7 @@ contract StandardEvent is NRC223Receiver, Ownable {
         uint8 resultIndex)
         external
         payable
+        isInBettingPhase
         validResultIndex(resultIndex)
     {
         require(block.timestamp >= _betStartTime);
@@ -184,19 +201,20 @@ contract StandardEvent is NRC223Receiver, Ownable {
         require(msg.value > 0);
 
         // Update balances
-        _roundBalances[0].resultBalances[resultIndex].totalBets =
-            _roundBalances[0].resultBalances[resultIndex].totalBets.add(_amount);
-        _roundBalances[0].resultBalances[resultIndex].bets[msg.sender] =
-            _roundBalances[0].resultBalances[resultIndex].bets[msg.sender].add(_amount);
+        _eventRounds[0].resultBalances[resultIndex].totalBets =
+            _eventRounds[0].resultBalances[resultIndex].totalBets.add(msg.value);
+        _eventRounds[0].resultBalances[resultIndex].bets[msg.sender] =
+            _eventRounds[0].resultBalances[resultIndex].bets[msg.sender].add(msg.value);
         _totalBetAmount = _totalBetAmount.add(msg.value);
 
+        // Emit events
         emit BetPlaced(address(this), msg.sender, resultIndex, msg.value);
     }
 
     /// @notice Finalizes the current result.
     /// @param _decentralizedOracle Address of the DecentralizedOracle contract.
     function finalizeResult(address _decentralizedOracle) external {
-        require(status == Status.OracleVoting);
+        require(status == Status.Arbitration);
         bool isValid = IDecentralizedOracle(_decentralizedOracle).validateFinalize();
         assert(isValid);
 
@@ -294,51 +312,65 @@ contract StandardEvent is NRC223Receiver, Ownable {
         return (arbitrationTokenReturn, betTokenReturn);
     }
 
-    function initCentralizedOracle() private {
-        balances.push(RoundBalances())
+    function initCentralizedOracle(uint256 consensusThreshold) private {
+        _eventRounds.push(EventRound({
+            lastResultIndex: INVALID_RESULT_INDEX,
+            resultIndex: INVALID_RESULT_INDEX,
+            consensusThreshold: consensusThreshold
+        }))
     }
 
-    function createDecentralizedOracle(uint256 _consensusThreshold) private {
-        address oracleFactory = addressManager.oracleFactoryVersionToAddress(version);
-        uint256 arbitrationLength = addressManager.arbitrationLength();
-        address newOracle = IOracleFactory(oracleFactory).createDecentralizedOracle(address(this), numOfResults, 
-            resultIndex, block.timestamp.add(arbitrationLength), _consensusThreshold);
-        assert(newOracle != address(0));
-    }
-
-    /// @dev Set the result as the result setter. tokenFallback should be calling this.
-    /// @param _centralizedOracle Address of the CentralizedOracle contract.
-    /// @param _resultSetter Entity who is setting the result.
-    /// @param _resultIndex Index of the result to set.
-    /// @param _consensusThreshold Threshold that the result setter is voting to validate the result.
-    function setResult(
-        address _centralizedOracle,
-        address _resultSetter,
-        uint8 _resultIndex,
-        uint256 _consensusThreshold)
+    function initDecentralizedOracle(
+        uint8 lastResultIndex,
+        uint256 consensusThreshold)
         private
     {
-        require(status == Status.Betting);
+        _eventRounds.push(EventRound({
+            lastResultIndex: lastResultIndex,
+            resultIndex: INVALID_RESULT_INDEX,
+            consensusThreshold: consensusThreshold
+        }))
+    }
 
-        bool isValid = ICentralizedOracle(_centralizedOracle)
-            .validateSetResult(_resultSetter, _resultIndex, _consensusThreshold);
-        assert(isValid);
+    /// @dev Centralized Oracle sets the result. Only tokenFallback should be calling this.
+    /// @param from Address who called setResult.
+    /// @param resultIndex Index of the result to set.
+    /// @param value Amount of tokens that was sent when calling setResult.
+    function setResult(
+        address from,
+        uint8 resultIndex,
+        uint256 value)
+        private
+        isInBettingPhase
+        validResultIndex(resultIndex)
+    {
+        require(block.timestamp >= _resultSetStartTime);
+        if (block.timestamp < _resultSetEndTime) {
+            require(from == _centralizedOracle);
+        }
+        require(value == _eventRounds[0].consensusThreshold);
 
-        // Update statuses and current result
-        status = Status.OracleVoting;
-        resultIndex = _resultIndex;
+        // Update status and result
+        _status = Status.Arbitration;
+        _currentResultIndex = resultIndex;
+        _eventRounds[0].resultIndex = resultIndex;
+        _currentRound = _currentRound + 1;
 
         // Update balances
-        balances[_resultIndex].totalVotes = balances[_resultIndex].totalVotes.add(_consensusThreshold);
-        balances[_resultIndex].votes[_resultSetter] = balances[_resultIndex].votes[_resultSetter]
-            .add(_consensusThreshold);
-        totalArbitrationTokens = totalArbitrationTokens.add(_consensusThreshold);
+        _eventRounds[0].resultBalances[resultIndex].totalVotes =
+            _eventRounds[0].resultBalances[resultIndex].totalVotes.add(value);
+        _eventRounds[0].resultBalances[resultIndex].votes[from] =
+            _eventRounds[0].resultBalances[resultIndex].votes[from].add(value);
+        _totalVoteAmount = _totalVoteAmount.add(value);
 
-        ICentralizedOracle(_centralizedOracle).recordSetResult(_resultSetter, _resultIndex, _consensusThreshold);
+        // Init DecentralizedOracle round
+        uint256 increment = _thresholdPercentIncrease
+            .mul(_eventRounds[0].consensusThreshold).div(100);
+        uint256 nextThreshold = _eventRounds[0].consensusThreshold.add(increment);
+        initDecentralizedOracle(resultIndex, nextThreshold)
 
-        // Deploy DecentralizedOracle
-        uint256 increment = addressManager.thresholdPercentIncrease().mul(_consensusThreshold).div(100);
-        createDecentralizedOracle(_consensusThreshold.add(increment));
+        // Emit events
+        emit ResultSet(address(this), from, resultIndex, value);
     }
 
     /// @dev Vote against the current result. tokenFallback should be calling this.
@@ -376,7 +408,7 @@ contract StandardEvent is NRC223Receiver, Ownable {
         private
     {
         // Update statuses
-        status = Status.OracleVoting;
+        status = Status.Arbitration;
         resultIndex = _resultIndex;
 
         // Record result in DecentralizedOracle
