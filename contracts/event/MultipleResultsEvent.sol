@@ -7,7 +7,7 @@ import "../lib/Ownable.sol";
 import "../lib/SafeMath.sol";
 import "../lib/ByteUtils.sol";
 
-contract StandardEvent is NRC223Receiver, Ownable {
+contract MultipleResultsEvent is NRC223Receiver, Ownable {
     using ByteUtils for bytes;
     using ByteUtils for bytes32;
     using SafeMath for uint256;
