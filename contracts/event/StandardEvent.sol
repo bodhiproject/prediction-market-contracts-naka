@@ -299,13 +299,13 @@ contract StandardEvent is NRC223Receiver, Ownable {
     }
 
     /// @notice Calculates the tokens returned based on the sender's participation.
-    /// @return The amount of arbitration tokens and bet tokens won.
+    /// @return Amount of bet and vote tokens won.
     function calculateWinnings()
         public
         view
-        inCollectionStatus()
-        returns (uint256 arbitrationTokens, uint256 betTokens)
+        returns (uint256, uint256)
     {
+        // TODO: redo with new balance structure
         uint256 votes = balances[resultIndex].votes[msg.sender];
         uint256 bets = balances[resultIndex].bets[msg.sender];
 
