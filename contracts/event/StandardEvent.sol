@@ -39,7 +39,7 @@ contract StandardEvent is NRC223Receiver, Ownable {
     }
 
     uint16 public constant VERSION = 0;
-    uint8 public constant INVALID_RESULT_INDEX = 255;
+    uint8 private constant INVALID_RESULT_INDEX = 255;
 
     Status private _status = Status.Betting;
     bool private _escrowWithdrawn;
@@ -151,7 +151,7 @@ contract StandardEvent is NRC223Receiver, Ownable {
         _thresholdPercentIncrease = configManager.thresholdPercentIncrease();
 
         // Init CentralizedOracle round
-        initCentralizedOracle(configManager.startingOracleThreshold());
+        initEventRound(INVALID_RESULT_INDEX, configManager.startingOracleThreshold());
     }
 
     /// @notice Fallback function implemented to accept native tokens for betting.
@@ -169,7 +169,7 @@ contract StandardEvent is NRC223Receiver, Ownable {
     {
         // TODO: check token address and make sure NBOT is accepted only
 
-        bytes memory setResultFunc = hex"65f4ced1";
+        bytes memory setResultFunc = hex"a6b4218b";
         bytes memory voteFunc = hex"6f02d1fb";
 
         bytes memory funcHash = data.sliceBytes(0, 4);
@@ -312,15 +312,7 @@ contract StandardEvent is NRC223Receiver, Ownable {
         return (arbitrationTokenReturn, betTokenReturn);
     }
 
-    function initCentralizedOracle(uint256 consensusThreshold) private {
-        _eventRounds.push(EventRound({
-            lastResultIndex: INVALID_RESULT_INDEX,
-            resultIndex: INVALID_RESULT_INDEX,
-            consensusThreshold: consensusThreshold
-        }))
-    }
-
-    function initDecentralizedOracle(
+    function initEventRound(
         uint8 lastResultIndex,
         uint256 consensusThreshold)
         private
@@ -367,7 +359,7 @@ contract StandardEvent is NRC223Receiver, Ownable {
         uint256 increment = _thresholdPercentIncrease
             .mul(_eventRounds[0].consensusThreshold).div(100);
         uint256 nextThreshold = _eventRounds[0].consensusThreshold.add(increment);
-        initDecentralizedOracle(resultIndex, nextThreshold)
+        initEventRound(resultIndex, nextThreshold);
 
         // Emit events
         emit ResultSet(address(this), from, resultIndex, value);
