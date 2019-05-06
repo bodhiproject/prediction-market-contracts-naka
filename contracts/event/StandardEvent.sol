@@ -103,16 +103,18 @@ contract StandardEvent is NRC223Receiver, Ownable {
     // Modifiers
     modifier inBettingStatus() {
         require(_status == Status.Betting);
+        _;
     }
     modifier inArbitrationStatus() {
         require(_status == Status.Arbitration);
+        _;
+    }
+    modifier readyToWithdraw() {
+        require(block.timestamp >= _eventRounds[_currentRound].arbitrationEndTime);
+        _;
     }
     modifier validResultIndex(uint8 resultIndex) {
         require (resultIndex <= _numOfResults - 1);
-        _;
-    }
-    modifier inCollectionStatus() {
-        require(status == Status.Collection);
         _;
     }
 
@@ -233,14 +235,10 @@ contract StandardEvent is NRC223Receiver, Ownable {
     }
 
     /// @notice Withdraw winnings if the DecentralizedOracle round arbitrationEndTime has passed.
-    function withdraw() external {
-        require(block.timestamp >= _eventRounds[_currentRound].arbitrationEndTime);
-
+    function withdraw() external readyToWithdraw {
         // Finalize the result if not already done
         if (_status != status.Collection) {
-            _status = Status.Collection;
-            _eventRounds[_currentRound].finished = true
-            emit FinalResultSet(address(this), _currentResultIndex);
+            finalizeResult()
         }
 
         require(!_didWithdraw[msg.sender]);
@@ -260,13 +258,18 @@ contract StandardEvent is NRC223Receiver, Ownable {
         emit WinningsWithdrawn(msg.sender, betTokenAmount, voteTokenAmount);
     }
 
-    /// @notice Allows the creator of the Event to withdraw the escrow amount.
-    function withdrawEscrow() external onlyOwner() inCollectionStatus() {
-        require(!escrowWithdrawn);
+    /// @notice Allows the owner of the Event to withdraw the escrow.
+    function withdrawEscrow() external readyToWithdraw onlyOwner {
+        // Finalize the result if not already done
+        if (_status != status.Collection) {
+            finalizeResult()
+        }
+
+        require(!_escrowWithdrawn);
 
         escrowWithdrawn = true;
-
-        addressManager.withdrawEscrow(msg.sender, escrowAmount);
+        // TODO: IronBank.withdrawEscrow()
+        // addressManager.withdrawEscrow(msg.sender, escrowAmount);
     }
 
     function getEventRound(uint8 index) public view returns (EventRound) {
@@ -444,6 +447,14 @@ contract StandardEvent is NRC223Receiver, Ownable {
 
         // Emit events
         emit VoteResultSet(address(this), from, resultIndex, value);
+    }
+
+    /// @dev Finalizes the result before doing a withdraw.
+    function finalizeResult() {
+        _status = Status.Collection;
+        _eventRounds[_currentRound].finished = true
+
+        emit FinalResultSet(address(this), _currentResultIndex);
     }
 
     function getNextThreshold(
