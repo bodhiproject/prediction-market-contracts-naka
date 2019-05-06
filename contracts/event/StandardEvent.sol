@@ -22,6 +22,7 @@ contract StandardEvent is NRC223Receiver, Ownable {
 
     // Represents the aggregated bets/votes of a round.
     struct EventRound {
+        bool finished;
         uint8 lastResultIndex;
         uint8 resultIndex;
         uint256 consensusThreshold;
@@ -167,7 +168,10 @@ contract StandardEvent is NRC223Receiver, Ownable {
         _thresholdPercentIncrease = configManager.thresholdPercentIncrease();
 
         // Init CentralizedOracle round
-        initEventRound(INVALID_RESULT_INDEX, configManager.startingOracleThreshold());
+        initEventRound(
+            INVALID_RESULT_INDEX,
+            configManager.startingOracleThreshold(),
+            0);
     }
 
     /// @notice Fallback function implemented to accept native tokens for betting.
@@ -186,7 +190,7 @@ contract StandardEvent is NRC223Receiver, Ownable {
         // TODO: check token address and make sure NBOT is accepted only
 
         bytes memory setResultFunc = hex"a6b4218b";
-        bytes memory voteFunc = hex"6f02d1fb";
+        bytes memory voteFunc = hex"1e00eb7f";
 
         bytes memory funcHash = data.sliceBytes(0, 4);
         uint8 resultIndex = uint8(data.sliceUint(4));
@@ -227,10 +231,11 @@ contract StandardEvent is NRC223Receiver, Ownable {
         emit BetPlaced(address(this), msg.sender, resultIndex, msg.value);
     }
 
-    /// @notice Finalizes the current result.
-    /// @param _decentralizedOracle Address of the DecentralizedOracle contract.
-    function finalizeResult(address _decentralizedOracle) external {
-        require(status == Status.Arbitration);
+    /// @notice Finalizes the current result and allows withdrawing winnings.
+    function finalizeResult() external inArbitrationStatus {
+        require(block.timestamp >= _eventRounds[_currentRound].arbitrationEndTime);
+
+
         bool isValid = IDecentralizedOracle(_decentralizedOracle).validateFinalize();
         assert(isValid);
 
@@ -334,13 +339,15 @@ contract StandardEvent is NRC223Receiver, Ownable {
 
     function initEventRound(
         uint8 lastResultIndex,
-        uint256 consensusThreshold)
+        uint256 consensusThreshold,
+        uint256 arbitrationEndTime)
         private
     {
         _eventRounds.push(EventRound({
             lastResultIndex: lastResultIndex,
             resultIndex: INVALID_RESULT_INDEX,
-            consensusThreshold: consensusThreshold
+            consensusThreshold: consensusThreshold,
+            arbitrationEndTime: arbitrationEndTime
         }))
     }
 
@@ -376,7 +383,10 @@ contract StandardEvent is NRC223Receiver, Ownable {
         _totalVoteAmount = _totalVoteAmount.add(value);
 
         // Init DecentralizedOracle round
-        initEventRound(resultIndex, getNextThreshold(_eventRounds[0].consensusThreshold));
+        initEventRound(
+            resultIndex,
+            getNextThreshold(_eventRounds[0].consensusThreshold),
+            block.timestamp.add(_arbitrationLength));
 
         // Emit events
         emit ResultSet(address(this), from, resultIndex, value);
@@ -409,8 +419,8 @@ contract StandardEvent is NRC223Receiver, Ownable {
         emit VotePlaced(address(this), from, resultIndex, value);
 
         // If voted over the threshold, create a new DecentralizedOracle round
-        uint256 threshold = _eventRounds[_currentRound].consensusThreshold;
         uint256 resultVotes = _eventRounds[_currentRound].resultBalances[resultIndex].totalVotes;
+        uint256 threshold = _eventRounds[_currentRound].consensusThreshold;
         if (resultVotes >= threshold) {
             voteSetResult()
         }
@@ -429,7 +439,8 @@ contract StandardEvent is NRC223Receiver, Ownable {
         // Init next DecentralizedOracle round
         initEventRound(
             resultIndex,
-            getNextThreshold(_eventRounds[_currentRound].consensusThreshold));
+            getNextThreshold(_eventRounds[_currentRound].consensusThreshold),
+            block.timestamp.add(_arbitrationLength));
 
         // Update status and result
         _status = Status.Arbitration;
