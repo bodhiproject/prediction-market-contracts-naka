@@ -7,6 +7,7 @@ contract ConfigManager is IAddressManager, Ownable {
     uint256 private constant TOKEN_DECIMALS = 8;
 
     uint8 private _arbitrationRewardPercentage = 1;
+    address private _bodhiTokenAddress;
     address private _eventFactoryAddress;
     uint256 private _eventEscrowAmount = 100 * (10 ** TOKEN_DECIMALS);
     uint256 private _arbitrationLength = 24 * 60 * 60; // 1 day
@@ -15,6 +16,7 @@ contract ConfigManager is IAddressManager, Ownable {
     mapping(address => bool) private _whitelistedContracts;
 
     // Events
+    event BodhiTokenChanged(address indexed oldAddress, address indexed newAddress);
     event EventFactoryChanged(address indexed oldAddress, address indexed newAddress);
     event ContractWhitelisted(address indexed contractAddress);
 
@@ -39,6 +41,20 @@ contract ConfigManager is IAddressManager, Ownable {
         _whitelistedContracts[contractAddress] = true;
 
         emit ContractWhitelisted(contractAddress);
+    }
+
+    /// @dev Allows the owner to set the address of an BodhiToken contract.
+    /// @param contractAddress Address of the BodhiToken contract.
+    function setBodhiToken(
+        address contractAddress)
+        external
+        onlyOwner
+        validAddress(contractAddress) 
+    {
+        address oldAddress = _bodhiTokenAddress;
+        _bodhiTokenAddress = contractAddress;
+
+        emit BodhiTokenChanged(oldAddress, _bodhiTokenAddress);
     }
 
     /// @dev Allows the owner to set the address of an EventFactory contract.
@@ -106,6 +122,10 @@ contract ConfigManager is IAddressManager, Ownable {
         onlyOwner
     {
         _thresholdPercentIncrease = newPercentage;
+    }
+
+    function bodhiTokenAddress() external view returns (address) {
+        return _bodhiTokenAddress;
     }
 
     function eventEscrowAmount() external view returns (uint256) {

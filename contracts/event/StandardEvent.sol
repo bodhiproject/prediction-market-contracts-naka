@@ -50,6 +50,7 @@ contract StandardEvent is NRC223Receiver, Ownable {
     uint8 private _currentResultIndex;
     bytes32[10] private _eventName;
     bytes32[11] private _eventResults;
+    address private _bodhiTokenAddress;
     address private _centralizedOracle;
     uint256 private _betStartTime;
     uint256 private _betEndTime;
@@ -90,15 +91,13 @@ contract StandardEvent is NRC223Receiver, Ownable {
         uint256 amount
     );
     event FinalResultSet(
-        uint16 indexed version, 
-        address indexed eventAddress, 
+        address indexed eventAddress,
         uint8 finalResultIndex
     );
     event WinningsWithdrawn(
-        uint16 indexed version, 
-        address indexed winner, 
+        address indexed winner,
         uint256 betTokensAmount,
-        uint256 arbitrationTokensAmount
+        uint256 voteTokensAmount
     );
 
     // Modifiers
@@ -162,6 +161,8 @@ contract StandardEvent is NRC223Receiver, Ownable {
 
         // Fetch current config and set
         IConfigManager configManager = IConfigManager(configManager);
+        _bodhiTokenAddress = configManager.bodhiTokenAddress();
+        assert(_bodhiTokenAddress != address(0));
         _escrowAmount = configManager.eventEscrowAmount();
         _arbitrationLength = configManager.arbitrationLength();
         _arbitrationRewardPercentage = configManager.arbitrationRewardPercentage();
@@ -231,42 +232,32 @@ contract StandardEvent is NRC223Receiver, Ownable {
         emit BetPlaced(address(this), msg.sender, resultIndex, msg.value);
     }
 
-    /// @notice Finalizes the current result and allows withdrawing winnings.
-    function finalizeResult() external inArbitrationStatus {
+    /// @notice Withdraw winnings if the DecentralizedOracle round arbitrationEndTime has passed.
+    function withdraw() external {
         require(block.timestamp >= _eventRounds[_currentRound].arbitrationEndTime);
 
+        // Finalize the result if not already done
+        if (_status != status.Collection) {
+            _status = Status.Collection;
+            _eventRounds[_currentRound].finished = true
+            emit FinalResultSet(address(this), _currentResultIndex);
+        }
 
-        bool isValid = IDecentralizedOracle(_decentralizedOracle).validateFinalize();
-        assert(isValid);
-
-        // Update status
-        status = Status.Collection;
-
-        // Record result in DecentralizedOracle
-        uint8 lastResultIndex = IDecentralizedOracle(_decentralizedOracle).lastResultIndex();
-        IDecentralizedOracle(_decentralizedOracle).recordSetResult(lastResultIndex, false);
- 
-        emit FinalResultSet(version, address(this), lastResultIndex);
-    }
-
-    /// @notice Allows winners of the Event to withdraw their winnings after the final result is set.
-    function withdrawWinnings() external inCollectionStatus() {
-        require(!didWithdraw[msg.sender]);
+        require(!_didWithdraw[msg.sender]);
 
         didWithdraw[msg.sender] = true;
-
-        uint256 arbitrationTokenAmount;
+        uint256 voteTokenAmount;
         uint256 betTokenAmount;
-        (arbitrationTokenAmount, betTokenAmount) = calculateWinnings();
+        (voteTokenAmount, betTokenAmount) = calculateWinnings();
 
         if (betTokenAmount > 0) {
             msg.sender.transfer(betTokenAmount);
         }
-        if (arbitrationTokenAmount > 0) {
-            ERC223(addressManager.bodhiTokenAddress()).transfer(msg.sender, arbitrationTokenAmount);
+        if (voteTokenAmount > 0) {
+            INRC223(_bodhiTokenAddress).transfer(msg.sender, voteTokenAmount);
         }
 
-        emit WinningsWithdrawn(version, msg.sender, betTokenAmount, arbitrationTokenAmount);
+        emit WinningsWithdrawn(msg.sender, betTokenAmount, voteTokenAmount);
     }
 
     /// @notice Allows the creator of the Event to withdraw the escrow amount.
@@ -344,6 +335,7 @@ contract StandardEvent is NRC223Receiver, Ownable {
         private
     {
         _eventRounds.push(EventRound({
+            finished: false,
             lastResultIndex: lastResultIndex,
             resultIndex: INVALID_RESULT_INDEX,
             consensusThreshold: consensusThreshold,
@@ -371,9 +363,10 @@ contract StandardEvent is NRC223Receiver, Ownable {
 
         // Update status and result
         _status = Status.Arbitration;
-        _currentRound = _currentRound + 1;
-        _currentResultIndex = resultIndex;
+        _eventRounds[0].finished = true;
         _eventRounds[0].resultIndex = resultIndex;
+        _currentResultIndex = resultIndex;
+        _currentRound = _currentRound + 1;
 
         // Update balances
         _eventRounds[0].resultBalances[resultIndex].totalVotes =
@@ -445,6 +438,7 @@ contract StandardEvent is NRC223Receiver, Ownable {
         // Update status and result
         _status = Status.Arbitration;
         _eventRounds[_currentRound].resultIndex = resultIndex;
+        _eventRounds[_currentRound].finished = true;
         _currentResultIndex = resultIndex;
         _currentRound = _currentRound + 1;
 
@@ -452,7 +446,11 @@ contract StandardEvent is NRC223Receiver, Ownable {
         emit VoteResultSet(address(this), from, resultIndex, value);
     }
 
-    function getNextThreshold(uint256 currentThreshold) {
+    function getNextThreshold(
+        uint256 currentThreshold)
+        private
+        returns (uint256)
+    {
         uint256 increment = _thresholdPercentIncrease.mul(currentThreshold).div(100);
         return currentThreshold.add(increment);
     }
