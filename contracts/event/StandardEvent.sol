@@ -1,17 +1,17 @@
 pragma solidity ^0.5.8;
 
 import "../BaseContract.sol";
-import "../storage/IAddressManager.sol";
+import "../storage/IConfigManager.sol";
 import "../oracle/IOracleFactory.sol";
 import "../oracle/ICentralizedOracle.sol";
 import "../oracle/IDecentralizedOracle.sol";
-import "../token/ERC223.sol";
-import "../token/ERC223ReceivingContract.sol";
+import "../token/INRC223.sol";
+import "../token/NRC223Receiver.sol";
 import "../lib/Ownable.sol";
 import "../lib/SafeMath.sol";
 import "../lib/ByteUtils.sol";
 
-contract StandardEvent is ERC223ReceivingContract, BaseContract, Ownable {
+contract StandardEvent is NRC223Receiver, BaseContract, Ownable {
     using ByteUtils for bytes;
     using ByteUtils for bytes32;
     using SafeMath for uint256;
@@ -26,30 +26,39 @@ contract StandardEvent is ERC223ReceivingContract, BaseContract, Ownable {
         Collection
     }
 
+    uint16 public constant VERSION = 0;
     // Percentage of loser's betting tokens to be distributed to winners who particated in arbitration
     uint8 public constant ARBITRATION_REWARD_PERCENTAGE = 1;
 
-    Status public status = Status.Betting;
-    bool public escrowWithdrawn;
-    bytes32[10] public eventName;
-    bytes32[11] public eventResults;
-    uint256 public totalBetTokens;
-    uint256 public totalArbitrationTokens;
-    uint256 public escrowAmount;
-    IAddressManager private addressManager;
-    mapping(address => bool) public didWithdraw;
+    Status public _status = Status.Betting;
+    bool public _escrowWithdrawn;
+    uint8 public _numOfResults;
+    bytes32[10] public _eventName;
+    bytes32[11] public _eventResults;
+    address public _centralizedOracle;
+    uint256 public _betStartTime;
+    uint256 public _betEndTime;
+    uint256 public _resultSetStartTime;
+    uint256 public _resultSetEndTime;
+    uint256 public _totalBetTokens;
+    uint256 public _totalArbitrationTokens;
+    uint256 public _escrowAmount;
+    uint256 public _arbitrationLength;
+    uint256 public _startingOracleThreshold;
+    uint256 public _thresholdPercentIncrease;
+    mapping(address => bool) public _didWithdraw;
 
     // Events
     event FinalResultSet(
-        uint16 indexed _version, 
-        address indexed _eventAddress, 
-        uint8 _finalResultIndex
+        uint16 indexed version, 
+        address indexed eventAddress, 
+        uint8 finalResultIndex
     );
     event WinningsWithdrawn(
-        uint16 indexed _version, 
-        address indexed _winner, 
-        uint256 _betTokensAmount,
-        uint256 _arbitrationTokensAmount
+        uint16 indexed version, 
+        address indexed winner, 
+        uint256 betTokensAmount,
+        uint256 arbitrationTokensAmount
     );
 
     // Modifiers
@@ -58,52 +67,55 @@ contract StandardEvent is ERC223ReceivingContract, BaseContract, Ownable {
         _;
     }
 
-    /// @notice Creates new StandardEvent contract.
-    /// @param _version The contract version.
-    /// @param _owner The address of the owner.
-    /// @param _resultSetter The address of the CentralizedOracle that will decide the result.
-    /// @param _name The question or statement prediction broken down by multiple bytes32.
-    /// @param _resultNames The possible results.
-    /// @param _bettingStartTime The unix time when betting will start.
-    /// @param _bettingEndTime The unix time when betting will end.
-    /// @param _resultSettingStartTime The unix time when the CentralizedOracle can set the result.
-    /// @param _resultSettingEndTime The unix time when anyone can set the result.
-    /// @param _addressManager The address of the AddressManager.
+    /// @notice Creates a new StandardEvent contract.
+    /// @param owner Address of the owner.
+    /// @param eventName Question or statement prediction broken down by multiple bytes32.
+    /// @param eventResults Possible results.
+    /// @param numOfResults Number of results for the event.
+    /// @param betStartTime Unix time when betting will start.
+    /// @param betEndTime Unix time when betting will end.
+    /// @param resultSetStartTime Unix time when the CentralizedOracle can set the result.
+    /// @param resultSetEndTime Unix time when anyone can set the result.
+    /// @param centralizedOracle Address of the user that will decide the result.
+    /// @param configManager Address of the ConfigManager.
     constructor(
-        uint16 _version,
-        address _owner,
-        address _resultSetter,
-        bytes32[10] _name,
-        bytes32[11] _resultNames,
-        uint8 _numOfResults,
-        uint256 _bettingStartTime,
-        uint256 _bettingEndTime,
-        uint256 _resultSettingStartTime,
-        uint256 _resultSettingEndTime,
-        address _addressManager)
-        Ownable(_owner)
+        address owner,
+        bytes32[10] eventName,
+        bytes32[11] eventResults,
+        uint8 numOfResults,
+        uint256 betStartTime,
+        uint256 betEndTime,
+        uint256 resultSetStartTime,
+        uint256 resultSetEndTime,
+        address centralizedOracle,
+        address configManager)
+        Ownable(owner)
         public
-        validAddress(_resultSetter)
-        validAddress(_addressManager)
+        validAddress(resultSetter)
+        validAddress(configManager)
     {
-        require(!_name[0].isEmpty());
-        require(!_resultNames[0].isEmpty());
-        require(!_resultNames[1].isEmpty());
-        require(_bettingEndTime > _bettingStartTime);
-        require(_resultSettingStartTime >= _bettingEndTime);
-        require(_resultSettingEndTime > _resultSettingStartTime);
+        require(!eventName[0].isEmpty());
+        require(!eventResults[0].isEmpty());
+        require(!eventResults[1].isEmpty());
+        require(betEndTime > betStartTime);
+        require(resultSetStartTime >= betEndTime);
+        require(resultSetEndTime > resultSetStartTime);
 
-        version = _version;
-        owner = _owner;
-        eventName = _name;
-        eventResults = _resultNames;
-        numOfResults = _numOfResults;
-        addressManager = IAddressManager(_addressManager);
-        escrowAmount = addressManager.eventEscrowAmount();
+        _eventName = eventName;
+        _eventResults = eventResults;
+        _numOfResults = numOfResults;
+        _betStartTime = betStartTime;
+        _betEndTime = betEndTime;
+        _resultSetStartTime = resultSetStartTime;
+        _resultSetEndTime = resultSetEndTime;
+        _centralizedOracle = centralizedOracle;
 
-        createCentralizedOracle(
-            _resultSetter, _bettingStartTime, _bettingEndTime, _resultSettingStartTime, _resultSettingEndTime
-        );
+        // Fetch current config
+        IConfigManager configManager = IConfigManager(configManager);
+        _escrowAmount = configManager.eventEscrowAmount();
+        _arbitrationLength = configManager.arbitrationLength();
+        _startingOracleThreshold = configManager.startingOracleThreshold();
+        _thresholdPercentIncrease = configManager.thresholdPercentIncrease();
     }
 
     /// @notice Fallback function that rejects any amount sent to the contract.

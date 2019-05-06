@@ -1,48 +1,46 @@
 pragma solidity ^0.5.8;
 
 import "./StandardEvent.sol";
-import "../storage/IAddressManager.sol";
+import "../storage/IConfigManager.sol";
 
 /// @title Event Factory allows the creation of individual prediction events.
 contract EventFactory {
     using ByteUtils for bytes32;
 
-    uint16 public version;
-    address private addressManager;
+    uint16 private constant _version = 0;
+    address private _configManager;
     mapping(bytes32 => StandardEvent) public events;
 
     // Events
     event StandardEventCreated(
-        uint16 indexed _version,
-        address indexed _eventAddress, 
-        address indexed _creatorAddress,
-        bytes32[10] _name, 
-        bytes32[11] _resultNames,
-        uint8 _numOfResults,
-        uint256 _escrowAmount
+        uint16 indexed version,
+        address indexed eventAddress, 
+        address indexed creatorAddress,
+        bytes32[10] name, 
+        bytes32[11] resultNames,
+        uint8 numOfResults,
+        uint256 escrowAmount
     );
 
-    constructor(address _addressManager) public {
-        require(_addressManager != address(0));
-
-        addressManager = _addressManager;
-        version = IAddressManager(addressManager).currentEventFactoryIndex();
+    constructor(address configManager) public {
+        require(configManager != address(0));
+        _configManager = configManager;
     }
     
     function createStandardEvent(
-        address _oracle, 
-        bytes32[10] _name, 
-        bytes32[10] _resultNames, 
-        uint256 _bettingStartTime,
-        uint256 _bettingEndTime,
-        uint256 _resultSettingStartTime,
-        uint256 _resultSettingEndTime)
+        address centralizedOracle, 
+        bytes32[10] name, 
+        bytes32[10] resultNames, 
+        uint256 bettingStartTime,
+        uint256 bettingEndTime,
+        uint256 resultSettingStartTime,
+        uint256 resultSettingEndTime)
         public
         returns (StandardEvent sEvent) 
     {
-        require(!_name[0].isEmpty());
-        require(!_resultNames[0].isEmpty());
-        require(!_resultNames[1].isEmpty());
+        require(!name[0].isEmpty());
+        require(!resultNames[0].isEmpty());
+        require(!resultNames[1].isEmpty());
         
         bytes32[11] memory resultNames;
         uint8 numOfResults;
