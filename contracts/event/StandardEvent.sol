@@ -1,25 +1,28 @@
 pragma solidity ^0.5.8;
 
-import "../BaseContract.sol";
 import "../storage/IConfigManager.sol";
-import "../oracle/IOracleFactory.sol";
-import "../oracle/ICentralizedOracle.sol";
-import "../oracle/IDecentralizedOracle.sol";
 import "../token/INRC223.sol";
 import "../token/NRC223Receiver.sol";
 import "../lib/Ownable.sol";
 import "../lib/SafeMath.sol";
 import "../lib/ByteUtils.sol";
 
-contract StandardEvent is NRC223Receiver, BaseContract, Ownable {
+contract StandardEvent is NRC223Receiver, Ownable {
     using ByteUtils for bytes;
     using ByteUtils for bytes32;
     using SafeMath for uint256;
 
+    struct ResultBalance {
+        uint256 totalBets;
+        uint256 totalVotes;
+        mapping(address => uint256) bets;
+        mapping(address => uint256) votes;
+    }
+
     /// @notice Status types
-    ///         Betting: Bet with the betting token during this phase.
-    ///         OracleVoting: Arbitrate with the arbitration token during this phase.
-    ///         Collection: Winners collect their winnings during this phase.
+    /// Betting: Bet with the betting token during this phase.
+    /// OracleVoting: Arbitrate with the arbitration token during this phase.
+    /// Collection: Winners collect their winnings during this phase.
     enum Status {
         Betting,
         OracleVoting,
@@ -27,8 +30,6 @@ contract StandardEvent is NRC223Receiver, BaseContract, Ownable {
     }
 
     uint16 public constant VERSION = 0;
-    // Percentage of loser's betting tokens to be distributed to winners who particated in arbitration
-    uint8 public constant ARBITRATION_REWARD_PERCENTAGE = 1;
 
     Status public _status = Status.Betting;
     bool public _escrowWithdrawn;
@@ -46,6 +47,7 @@ contract StandardEvent is NRC223Receiver, BaseContract, Ownable {
     uint256 public _arbitrationLength;
     uint256 public _startingOracleThreshold;
     uint256 public _thresholdPercentIncrease;
+    uint256 public _arbitrationRewardPercentage;
     mapping(address => bool) public _didWithdraw;
 
     // Events
@@ -62,6 +64,10 @@ contract StandardEvent is NRC223Receiver, BaseContract, Ownable {
     );
 
     // Modifiers
+    modifier validResultIndex(uint8 resultIndex) {
+        require (resultIndex <= _numOfResults - 1);
+        _;
+    }
     modifier inCollectionStatus() {
         require(status == Status.Collection);
         _;
@@ -114,20 +120,21 @@ contract StandardEvent is NRC223Receiver, BaseContract, Ownable {
         IConfigManager configManager = IConfigManager(configManager);
         _escrowAmount = configManager.eventEscrowAmount();
         _arbitrationLength = configManager.arbitrationLength();
+        _arbitrationRewardPercentage = configManager.arbitrationRewardPercentage();
         _startingOracleThreshold = configManager.startingOracleThreshold();
         _thresholdPercentIncrease = configManager.thresholdPercentIncrease();
     }
 
-    /// @notice Fallback function that rejects any amount sent to the contract.
-    function() external payable {
-        revert();
-    }
+    /// @notice Fallback function implemented to accept native tokens for betting.
+    function() external payable {}
 
-    /// @dev Standard ERC223 function that will handle incoming token transfers.
+    /// @dev Standard NRC223 function that will handle incoming token transfers.
     /// @param _from Token sender address.
     /// @param _value Amount of tokens.
     /// @param _data The message data. First 4 bytes is function hash & rest is function params.
     function tokenFallback(address _from, uint _value, bytes _data) external {
+        // TODO: check token address and make sure NBOT is accepted only
+
         bytes memory setResultFunc = hex"65f4ced1";
         bytes memory voteFunc = hex"6f02d1fb";
 
@@ -148,14 +155,21 @@ contract StandardEvent is NRC223Receiver, BaseContract, Ownable {
         }
     }
 
-    /// @notice Places a bet.
-    /// @param _centralizedOracle Address of the CentralizedOracle.
-    /// @param _resultIndex Index of result to bet on.
-    function bet(address _centralizedOracle, uint8 _resultIndex) external payable {
-        bool isValid = ICentralizedOracle(_centralizedOracle).validateBet(msg.sender, _resultIndex, msg.value);
-        assert(isValid);
+    /// @notice Place a bet.
+    /// @param resultIndex Index of result to bet on.
+    function bet(
+        uint8 resultIndex)
+        external
+        payable
+        validResultIndex(resultIndex)
+    {
+        require(block.timestamp >= _betStartTime);
+        require(block.timestamp < _betEndTime);
+        require(msg.value > 0);
 
         // Update balances
+
+
         balances[_resultIndex].totalBets = balances[_resultIndex].totalBets.add(msg.value);
         balances[_resultIndex].bets[msg.sender] = balances[_resultIndex].bets[msg.sender].add(msg.value);
         totalBetTokens = totalBetTokens.add(msg.value);

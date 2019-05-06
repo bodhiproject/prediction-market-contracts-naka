@@ -4,14 +4,15 @@ import "./IConfigManager.sol";
 import "../lib/Ownable.sol";
 
 contract ConfigManager is IAddressManager, Ownable {
-    uint256 private constant _tokenDecimals = 8;
+    uint256 private constant TOKEN_DECIMALS = 8;
 
+    uint8 private _arbitrationRewardPercentage = 1;
     address private _eventFactoryAddress;
-    uint256 private _eventEscrowAmount = 100 * (10 ** _tokenDecimals);
+    uint256 private _eventEscrowAmount = 100 * (10 ** TOKEN_DECIMALS);
     uint256 private _arbitrationLength = 24 * 60 * 60; // 1 day
-    uint256 private _startingOracleThreshold = 100 * (10 ** _tokenDecimals);
+    uint256 private _startingOracleThreshold = 100 * (10 ** TOKEN_DECIMALS);
     uint256 private _thresholdPercentIncrease = 10;
-    mapping(address => bool) private whitelistedContracts;
+    mapping(address => bool) private _whitelistedContracts;
 
     // Events
     event EventFactoryChanged(address indexed oldAddress, address indexed newAddress);
@@ -35,7 +36,7 @@ contract ConfigManager is IAddressManager, Ownable {
         isWhitelisted(msg.sender)
         validAddress(contractAddress)
     {
-        whitelistedContracts[contractAddress] = true;
+        _whitelistedContracts[contractAddress] = true;
 
         emit ContractWhitelisted(contractAddress);
     }
@@ -50,7 +51,7 @@ contract ConfigManager is IAddressManager, Ownable {
     {
         address oldAddress = _eventFactoryAddress;
         _eventFactoryAddress = contractAddress;
-        whitelistedContracts[contractAddress] = true;
+        _whitelistedContracts[contractAddress] = true;
 
         emit EventFactoryChanged(oldAddress, _eventFactoryAddress);
         emit ContractWhitelisted(contractAddress);
@@ -63,7 +64,7 @@ contract ConfigManager is IAddressManager, Ownable {
         external
         onlyOwner
     {
-        eventEscrowAmount = newAmount;
+        _eventEscrowAmount = newAmount;
     }
 
     /// @dev Sets the arbitration length.
@@ -74,7 +75,17 @@ contract ConfigManager is IAddressManager, Ownable {
         onlyOwner
     {   
         require(newLength > 0);
-        arbitrationLength = newLength;
+        _arbitrationLength = newLength;
+    }
+
+    /// @dev Sets the arbitration reward percentage.
+    /// @param newPercentage New percentage of the arbitration participation reward (e.g. 5)
+    function setArbitrationRewardPercentage(
+        uint256 newPercentage)
+        external
+        onlyOwner
+    {
+        _arbitrationRewardPercentage = newPercentage;
     }
 
     /// @dev Sets the starting betting threshold.
@@ -84,7 +95,7 @@ contract ConfigManager is IAddressManager, Ownable {
         external
         onlyOwner
     {
-        startingOracleThreshold = newThreshold;
+        _startingOracleThreshold = newThreshold;
     }
 
     /// @dev Sets the threshold percentage increase.
@@ -94,7 +105,7 @@ contract ConfigManager is IAddressManager, Ownable {
         external
         onlyOwner
     {
-        thresholdPercentIncrease = newPercentage;
+        _thresholdPercentIncrease = newPercentage;
     }
 
     function eventEscrowAmount() external view returns (uint256) {
@@ -103,6 +114,10 @@ contract ConfigManager is IAddressManager, Ownable {
 
     function arbitrationLength() external view returns (uint256) {
         return _arbitrationLength;
+    }
+
+    function arbitrationRewardPercentage() external view returns (uint8) {
+        return _arbitrationRewardPercentage;
     }
 
     function startingOracleThreshold() external view returns (uint256) {

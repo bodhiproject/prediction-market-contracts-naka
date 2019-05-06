@@ -15,12 +15,6 @@ contract BaseContract {
     uint16 public version;
     ResultBalance[11] internal balances;
 
-    // Modifiers
-    modifier validResultIndex(uint8 _resultIndex) {
-        require (_resultIndex <= numOfResults - 1);
-        _;
-    }
-
     /// @notice Gets the bet balances of the sender for all the results.
     /// @return An array of all the bet balances of the sender.
     function getBetBalances() public view returns (uint256[11]) {
