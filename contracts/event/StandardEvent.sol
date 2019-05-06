@@ -25,6 +25,7 @@ contract StandardEvent is NRC223Receiver, Ownable {
         uint8 lastResultIndex;
         uint8 resultIndex;
         uint256 consensusThreshold;
+        uint256 arbitrationEndTime;
         ResultBalance[11] resultBalances;
     }
 
@@ -75,6 +76,18 @@ contract StandardEvent is NRC223Receiver, Ownable {
         uint8 resultIndex,
         uint256 amount
     );
+    event VotePlaced(
+        address indexed eventAddress,
+        address indexed voter,
+        uint8 resultIndex,
+        uint256 amount
+    );
+    event VoteResultSet(
+        address indexed eventAddress,
+        address indexed voter,
+        uint8 resultIndex,
+        uint256 amount
+    );
     event FinalResultSet(
         uint16 indexed version, 
         address indexed eventAddress, 
@@ -88,8 +101,11 @@ contract StandardEvent is NRC223Receiver, Ownable {
     );
 
     // Modifiers
-    modifier isInBettingPhase() {
+    modifier inBettingStatus() {
         require(_status == Status.Betting);
+    }
+    modifier inArbitrationStatus() {
+        require(_status == Status.Arbitration);
     }
     modifier validResultIndex(uint8 resultIndex) {
         require (resultIndex <= _numOfResults - 1);
@@ -177,11 +193,11 @@ contract StandardEvent is NRC223Receiver, Ownable {
 
         bytes32 encodedFunc = keccak256(abi.encodePacked(funcHash));
         if (encodedFunc == keccak256(abi.encodePacked(setResultFunc))) {
-            assert(_data.length == 36);
+            assert(data.length == 36);
             setResult(from, resultIndex, value);
         } else if (encodedFunc == keccak256(abi.encodePacked(voteFunc))) {
-            assert(_data.length == 36);
-            vote(from, resultIndex, _value);
+            assert(data.length == 36);
+            vote(from, resultIndex, value);
         } else {
             revert("Unhandled function in tokenFallback");
         }
@@ -193,7 +209,7 @@ contract StandardEvent is NRC223Receiver, Ownable {
         uint8 resultIndex)
         external
         payable
-        isInBettingPhase
+        inBettingStatus
         validResultIndex(resultIndex)
     {
         require(block.timestamp >= _betStartTime);
@@ -255,6 +271,10 @@ contract StandardEvent is NRC223Receiver, Ownable {
         escrowWithdrawn = true;
 
         addressManager.withdrawEscrow(msg.sender, escrowAmount);
+    }
+
+    function getEventRound(uint8 index) public view returns (EventRound) {
+        return _eventRounds[index];
     }
 
     /// @notice Gets the final result index and flag indicating if the result is final.
@@ -325,7 +345,7 @@ contract StandardEvent is NRC223Receiver, Ownable {
     }
 
     /// @dev Centralized Oracle sets the result. Only tokenFallback should be calling this.
-    /// @param from Address who called setResult.
+    /// @param from Address who is setting the result.
     /// @param resultIndex Index of the result to set.
     /// @param value Amount of tokens that was sent when calling setResult.
     function setResult(
@@ -333,7 +353,7 @@ contract StandardEvent is NRC223Receiver, Ownable {
         uint8 resultIndex,
         uint256 value)
         private
-        isInBettingPhase
+        inBettingStatus
         validResultIndex(resultIndex)
     {
         require(block.timestamp >= _resultSetStartTime);
@@ -344,9 +364,9 @@ contract StandardEvent is NRC223Receiver, Ownable {
 
         // Update status and result
         _status = Status.Arbitration;
+        _currentRound = _currentRound + 1;
         _currentResultIndex = resultIndex;
         _eventRounds[0].resultIndex = resultIndex;
-        _currentRound = _currentRound + 1;
 
         // Update balances
         _eventRounds[0].resultBalances[resultIndex].totalVotes =
@@ -356,58 +376,73 @@ contract StandardEvent is NRC223Receiver, Ownable {
         _totalVoteAmount = _totalVoteAmount.add(value);
 
         // Init DecentralizedOracle round
-        uint256 increment = _thresholdPercentIncrease
-            .mul(_eventRounds[0].consensusThreshold).div(100);
-        uint256 nextThreshold = _eventRounds[0].consensusThreshold.add(increment);
-        initEventRound(resultIndex, nextThreshold);
+        initEventRound(resultIndex, getNextThreshold(_eventRounds[0].consensusThreshold));
 
         // Emit events
         emit ResultSet(address(this), from, resultIndex, value);
     }
 
-    /// @dev Vote against the current result. tokenFallback should be calling this.
-    /// @param _decentralizedOracle Address of the DecentralizedOracle contract.
-    /// @param _voter Entity who is voting.
-    /// @param _resultIndex Index of result to vote.
-    /// @param _amount Amount of tokens used to vote.
-    function vote(address _decentralizedOracle, address _voter, uint8 _resultIndex, uint256 _amount) private {
-        bool isValid = IDecentralizedOracle(_decentralizedOracle).validateVote(_voter, _resultIndex, _amount);
-        assert(isValid);
+    /// @dev Vote against the current result. Only tokenFallback should be calling this.
+    /// @param from Address who is voting.
+    /// @param resultIndex Index of result to vote.
+    /// @param value Amount of tokens used to vote.
+    function vote(
+        address from,
+        uint8 resultIndex,
+        uint256 value)
+        private
+        inArbitrationStatus
+        validResultIndex(resultIndex)
+    {
+        require(block.timestamp < _eventRounds[_currentRound].arbitrationEndTime);
+        require(resultIndex != _eventRounds[_currentRound].lastResultIndex);
+        require(value > 0);
 
         // Update balances
-        balances[_resultIndex].totalVotes = balances[_resultIndex].totalVotes.add(_amount);
-        balances[_resultIndex].votes[_voter] = balances[_resultIndex].votes[_voter].add(_amount);
-        _totalVoteAmount = _totalVoteAmount.add(_amount);
+        _eventRounds[_currentRound].resultBalances[resultIndex].totalVotes =
+            _eventRounds[_currentRound].resultBalances[resultIndex].totalVotes.add(value);
+        _eventRounds[_currentRound].resultBalances[resultIndex].votes[from] =
+            _eventRounds[_currentRound].resultBalances[resultIndex].votes[from].add(value);
+        _totalVoteAmount = _totalVoteAmount.add(value);
 
-        // Set result and deploy new DecentralizedOracle if threshold hit
-        bool didHitThreshold;
-        uint256 currentThreshold;
-        (didHitThreshold, currentThreshold) = IDecentralizedOracle(_decentralizedOracle)
-            .recordVote(_voter, _resultIndex, _amount);
-        if (didHitThreshold) {
-            decentralizedOracleSetResult(_decentralizedOracle, _resultIndex, currentThreshold);
+        // Emit events
+        emit VotePlaced(address(this), from, resultIndex, value);
+
+        // If voted over the threshold, create a new DecentralizedOracle round
+        uint256 threshold = _eventRounds[_currentRound].consensusThreshold;
+        uint256 resultVotes = _eventRounds[_currentRound].resultBalances[resultIndex].totalVotes;
+        if (resultVotes >= threshold) {
+            voteSetResult()
         }
     }
 
-    /// @dev Sets the result of the DecentralizedOracle and creates a new one.
-    /// @param _decentralizedOracle Address of the DecentralizedOracle contract.
-    /// @param _resultIndex Index of the result to set.
-    /// @param _currentConsensusThreshold The current consensus threshold for the DecentralizedOracle.
-    function decentralizedOracleSetResult(
-        address _decentralizedOracle,
-        uint8 _resultIndex,
-        uint256 _currentConsensusThreshold)
+    /// @dev Result got voted over the threshold so start a new DecentralizedOracle round.
+    /// @param from Address who is voted over the threshold.
+    /// @param resultIndex Index of result that was voted over the threshold.
+    /// @param value Amount of tokens used to vote.
+    function voteSetResult(
+        address from,
+        uint8 resultIndex,
+        uint256 value)
         private
     {
-        // Update statuses
-        status = Status.Arbitration;
-        resultIndex = _resultIndex;
+        // Init next DecentralizedOracle round
+        initEventRound(
+            resultIndex,
+            getNextThreshold(_eventRounds[_currentRound].consensusThreshold));
 
-        // Record result in DecentralizedOracle
-        IDecentralizedOracle(_decentralizedOracle).recordSetResult(_resultIndex, true);
+        // Update status and result
+        _status = Status.Arbitration;
+        _eventRounds[_currentRound].resultIndex = resultIndex;
+        _currentResultIndex = resultIndex;
+        _currentRound = _currentRound + 1;
 
-        // Deploy new DecentralizedOracle
-        uint256 increment = addressManager.thresholdPercentIncrease().mul(_currentConsensusThreshold).div(100);
-        createDecentralizedOracle(_currentConsensusThreshold.add(increment));
+        // Emit events
+        emit VoteResultSet(address(this), from, resultIndex, value);
+    }
+
+    function getNextThreshold(uint256 currentThreshold) {
+        uint256 increment = _thresholdPercentIncrease.mul(currentThreshold).div(100);
+        return currentThreshold.add(increment);
     }
 }
