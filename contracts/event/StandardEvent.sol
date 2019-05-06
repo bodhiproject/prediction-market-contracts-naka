@@ -64,7 +64,7 @@ contract StandardEvent is NRC223Receiver, Ownable {
         uint256 arbitrationRewardPercentage;
     }
 
-    uint16 public constant VERSION = 0;
+    uint16 private constant VERSION = 0;
     uint8 private constant INVALID_RESULT_INDEX = 255;
 
     Status private _status = Status.Betting;
@@ -215,7 +215,8 @@ contract StandardEvent is NRC223Receiver, Ownable {
         bytes data)
         external
     {
-        // TODO: check token address and make sure NBOT is accepted only
+        // Ensure only NBOT can call this method
+        require(msg.sender == _bodhiTokenAddress);
 
         bytes memory setResultFunc = hex"a6b4218b";
         bytes memory voteFunc = hex"1e00eb7f";
@@ -344,6 +345,10 @@ contract StandardEvent is NRC223Receiver, Ownable {
         }
 
         return (arbitrationTokenReturn, betTokenReturn);
+    }
+
+    function version() public view returns (uint16) {
+        return VERSION;
     }
 
     function status() public view returns (Status) {
