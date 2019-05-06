@@ -12,6 +12,16 @@ contract StandardEvent is NRC223Receiver, Ownable {
     using ByteUtils for bytes32;
     using SafeMath for uint256;
 
+    /// @notice Status types
+    /// Betting: Bet with the betting token.
+    /// Arbitration: Vote against previous rounds result with the arbitration token.
+    /// Collection: Winners collect their winnings.
+    enum Status {
+        Betting,
+        Arbitration,
+        Collection
+    }
+
     // Represents all the bets/votes of a specific result.
     struct ResultBalance {
         uint256 totalBets;
@@ -30,14 +40,28 @@ contract StandardEvent is NRC223Receiver, Ownable {
         ResultBalance[11] resultBalances;
     }
 
-    /// @notice Status types
-    /// Betting: Bet with the betting token during this phase.
-    /// Arbitration: Vote against set result with the arbitration token during this phase.
-    /// Collection: Winners collect their winnings during this phase.
-    enum Status {
-        Betting,
-        Arbitration,
-        Collection
+    // Represents the Event metadata.
+    struct EventMetadata {
+        string eventName;
+        bytes32[11] eventResults;
+        uint8 numOfResults;
+    }
+
+    // Represents the CentralizedOracle round metadata.
+    struct CentralizedMetadata {
+        address centralizedOracle;
+        uint256 betStartTime;
+        uint256 betEndTime;
+        uint256 resultSetStartTime;
+        uint256 resultSetEndTime;
+    }
+
+    // Represents the configuration metadata.
+    struct ConfigMetadata {
+        uint256 escrowAmount;
+        uint256 arbitrationLength;
+        uint256 thresholdPercentIncrease;
+        uint256 arbitrationRewardPercentage;
     }
 
     uint16 public constant VERSION = 0;
@@ -48,7 +72,7 @@ contract StandardEvent is NRC223Receiver, Ownable {
     uint8 private _numOfResults;
     uint8 private _currentRound = 0;
     uint8 private _currentResultIndex;
-    bytes32[10] private _eventName;
+    string private _eventName;
     bytes32[11] private _eventResults;
     address private _bodhiTokenAddress;
     address private _centralizedOracle;
@@ -131,7 +155,7 @@ contract StandardEvent is NRC223Receiver, Ownable {
     /// @param configManager Address of the ConfigManager.
     constructor(
         address owner,
-        bytes32[10] eventName,
+        string eventName,
         bytes32[11] eventResults,
         uint8 numOfResults,
         uint256 betStartTime,
@@ -145,7 +169,8 @@ contract StandardEvent is NRC223Receiver, Ownable {
         validAddress(resultSetter)
         validAddress(configManager)
     {
-        require(!eventName[0].isEmpty());
+        bytes memory eventNameBytes = bytes(eventName);
+        require(eventNameBytes.length > 0);
         require(!eventResults[0].isEmpty());
         require(!eventResults[1].isEmpty());
         require(betEndTime > betStartTime);
@@ -272,16 +297,6 @@ contract StandardEvent is NRC223Receiver, Ownable {
         // addressManager.withdrawEscrow(msg.sender, escrowAmount);
     }
 
-    function getEventRound(uint8 index) public view returns (EventRound) {
-        return _eventRounds[index];
-    }
-
-    /// @notice Gets the final result index and flag indicating if the result is final.
-    /// @return Result index and if it is the final result.
-    function getFinalResult() public view returns (uint8, bool) {
-        return (resultIndex, status == Status.Collection);
-    }
-
     /// @notice Calculates the tokens returned based on the sender's participation.
     /// @return The amount of arbitration tokens and bet tokens won.
     function calculateWinnings()
@@ -329,6 +344,61 @@ contract StandardEvent is NRC223Receiver, Ownable {
         }
 
         return (arbitrationTokenReturn, betTokenReturn);
+    }
+
+    function status() public view returns (Status) {
+        return _status;
+    }
+
+    function currentRound() public view returns (uint8) {
+        return _currentRound;
+    }
+
+    function currentResultIndex() public view returns (uint8) {
+        return _currentResultIndex;
+    }
+
+    function eventMetadata() public view returns (EventMetadata) {
+        return EventMetadata(
+            _eventName,
+            _eventResults,
+            _numOfResults
+        );
+    }
+
+    function centralizedMetadata() public view returns (CentralizedMetadata) {
+        return CentralizedMetadata(
+            _centralizedOracle,
+            _betStartTime,
+            _betEndTime,
+            _resultSetStartTime,
+            _resultSetEndTime
+        );
+    }
+
+    function configMetadata() public view returns (ConfigMetadata) {
+        return ConfigMetadata(
+            _escrowAmount,
+            _arbitrationLength,
+            _thresholdPercentIncrease,
+            _arbitrationRewardPercentage
+        );
+    }
+
+    function totalAmounts() public view returns (uint256, uint256) {
+        return (_totalBetAmount, _totalVoteAmount);
+    }
+
+    function eventRounds() public view returns (EventRound[]) {
+        return _eventRounds;
+    }
+
+    function didWithdraw() public view returns (bool) {
+        return _didWithdraw[msg.sender];
+    }
+
+    function didWithdrawEscrow() public view returns (bool) {
+        return _escrowWithdrawn;
     }
 
     function initEventRound(
