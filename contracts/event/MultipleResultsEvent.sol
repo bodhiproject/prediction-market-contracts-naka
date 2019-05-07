@@ -173,20 +173,20 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         _centralizedOracle = centralizedOracle;
 
         // Fetch current config and set
-        IConfigManager configManager = IConfigManager(configManager);
-        _bodhiTokenAddress = configManager.bodhiTokenAddress();
+        IConfigManager config = IConfigManager(configManager);
+        _bodhiTokenAddress = config.bodhiTokenAddress();
         assert(_bodhiTokenAddress != address(0));
-        _eventFactoryAddress = configManager.eventFactoryAddress();
+        _eventFactoryAddress = config.eventFactoryAddress();
         assert(_eventFactoryAddress != address(0));
-        _escrowAmount = configManager.eventEscrowAmount();
-        _arbitrationLength = configManager.arbitrationLength();
-        _arbitrationRewardPercentage = configManager.arbitrationRewardPercentage();
-        _thresholdPercentIncrease = configManager.thresholdPercentIncrease();
+        _escrowAmount = config.eventEscrowAmount();
+        _arbitrationLength = config.arbitrationLength();
+        _arbitrationRewardPercentage = config.arbitrationRewardPercentage();
+        _thresholdPercentIncrease = config.thresholdPercentIncrease();
 
         // Init CentralizedOracle round
         initEventRound(
             INVALID_RESULT_INDEX,
-            configManager.startingOracleThreshold(),
+            config.startingOracleThreshold(),
             0);
     }
 
@@ -210,7 +210,8 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         bytes memory voteFunc = hex"1e00eb7f";
 
         bytes memory funcHash = data.sliceBytes(0, 4);
-        uint8 resultIndex = uint8(data.sliceUint(4));
+        bytes memory params = data.sliceBytes(4, data.length);
+        (uint8 resultIndex) = abi.decode(params, (uint8));
 
         bytes32 encodedFunc = keccak256(abi.encodePacked(funcHash));
         if (encodedFunc == keccak256(abi.encodePacked(setResultFunc))) {
@@ -532,7 +533,7 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
     }
 
     /// @dev Finalizes the result before doing a withdraw.
-    function finalizeResult() {
+    function finalizeResult() private {
         _eventRounds[_currentRound].finished = true;
         emit FinalResultSet(address(this), _currentResultIndex, _currentRound);
     }
