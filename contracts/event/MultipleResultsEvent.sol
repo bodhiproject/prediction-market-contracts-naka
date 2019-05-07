@@ -11,7 +11,7 @@ import "../lib/ByteUtils.sol";
 contract MultipleResultsEvent is NRC223Receiver, Ownable {
     using ByteUtils for bytes;
     using ByteUtils for bytes32;
-    using SafeMath for uint256;
+    using SafeMath for uint;
 
     /// @notice Status types
     /// Betting: Bet with the betting token.
@@ -25,10 +25,10 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
 
     // Represents all the bets/votes of a specific result.
     struct ResultBalance {
-        uint256 totalBets;
-        uint256 totalVotes;
-        mapping(address => uint256) bets;
-        mapping(address => uint256) votes;
+        uint totalBets;
+        uint totalVotes;
+        mapping(address => uint) bets;
+        mapping(address => uint) votes;
     }
 
     // Represents the aggregated bets/votes of a round.
@@ -36,8 +36,8 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         bool finished;
         uint8 lastResultIndex;
         uint8 resultIndex;
-        uint256 consensusThreshold;
-        uint256 arbitrationEndTime;
+        uint consensusThreshold;
+        uint arbitrationEndTime;
         ResultBalance[11] resultBalances;
     }
 
@@ -51,18 +51,18 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
     // Represents the CentralizedOracle round metadata.
     struct CentralizedMetadata {
         address centralizedOracle;
-        uint256 betStartTime;
-        uint256 betEndTime;
-        uint256 resultSetStartTime;
-        uint256 resultSetEndTime;
+        uint betStartTime;
+        uint betEndTime;
+        uint resultSetStartTime;
+        uint resultSetEndTime;
     }
 
     // Represents the configuration metadata.
     struct ConfigMetadata {
-        uint256 escrowAmount;
-        uint256 arbitrationLength;
-        uint256 thresholdPercentIncrease;
-        uint256 arbitrationRewardPercentage;
+        uint escrowAmount;
+        uint arbitrationLength;
+        uint thresholdPercentIncrease;
+        uint arbitrationRewardPercentage;
     }
 
     uint16 private constant VERSION = 0;
@@ -77,16 +77,16 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
     address private _bodhiTokenAddress;
     address private _eventFactoryAddress;
     address private _centralizedOracle;
-    uint256 private _betStartTime;
-    uint256 private _betEndTime;
-    uint256 private _resultSetStartTime;
-    uint256 private _resultSetEndTime;
-    uint256 private _totalBetAmount;
-    uint256 private _totalVoteAmount;
-    uint256 private _escrowAmount;
-    uint256 private _arbitrationLength;
-    uint256 private _thresholdPercentIncrease;
-    uint256 private _arbitrationRewardPercentage;
+    uint private _betStartTime;
+    uint private _betEndTime;
+    uint private _resultSetStartTime;
+    uint private _resultSetEndTime;
+    uint private _totalBetAmount;
+    uint private _totalVoteAmount;
+    uint private _escrowAmount;
+    uint private _arbitrationLength;
+    uint private _thresholdPercentIncrease;
+    uint private _arbitrationRewardPercentage;
     EventRound[] private _eventRounds;
     mapping(address => bool) private _didWithdraw;
 
@@ -95,25 +95,25 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         address indexed eventAddress,
         address indexed better,
         uint8 resultIndex,
-        uint256 amount
+        uint amount
     );
     event ResultSet(
         address indexed eventAddress,
         address indexed centralizedOracle,
         uint8 resultIndex,
-        uint256 amount
+        uint amount
     );
     event VotePlaced(
         address indexed eventAddress,
         address indexed voter,
         uint8 resultIndex,
-        uint256 amount
+        uint amount
     );
     event VoteResultSet(
         address indexed eventAddress,
         address indexed voter,
         uint8 resultIndex,
-        uint256 amount
+        uint amount
     );
     event FinalResultSet(
         address indexed eventAddress,
@@ -160,10 +160,10 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         string eventName,
         bytes32[11] eventResults,
         uint8 numOfResults,
-        uint256 betStartTime,
-        uint256 betEndTime,
-        uint256 resultSetStartTime,
-        uint256 resultSetEndTime,
+        uint betStartTime,
+        uint betEndTime,
+        uint resultSetStartTime,
+        uint resultSetEndTime,
         address centralizedOracle,
         address configManager)
         Ownable(owner)
@@ -301,32 +301,32 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
     function calculateWinnings()
         public
         view
-        returns (uint256, uint256)
+        returns (uint, uint)
     {
         // TODO: redo with new balance structure
-        uint256 votes = balances[resultIndex].votes[msg.sender];
-        uint256 bets = balances[resultIndex].bets[msg.sender];
+        uint votes = balances[resultIndex].votes[msg.sender];
+        uint bets = balances[resultIndex].bets[msg.sender];
 
         // Calculate bet token reward
-        uint256 losersTotal = 0;
+        uint losersTotal = 0;
         for (uint8 i = 0; i < numOfResults; i++) {
             if (i != resultIndex) {
                 losersTotal = losersTotal.add(balances[i].totalBets);
             }
         }
-        uint256 betTokenReward = uint256(ARBITRATION_REWARD_PERCENTAGE).mul(losersTotal).div(100);
+        uint betTokenReward = uint(ARBITRATION_REWARD_PERCENTAGE).mul(losersTotal).div(100);
         losersTotal = losersTotal.sub(betTokenReward);
 
         // Calculate bet token return
-        uint256 winnersTotal;
-        uint256 betTokenReturn = 0;
+        uint winnersTotal;
+        uint betTokenReturn = 0;
         if (bets > 0) {
             winnersTotal = balances[resultIndex].totalBets;
             betTokenReturn = bets.mul(losersTotal).div(winnersTotal).add(bets);
         }
 
         // Calculate arbitration token return
-        uint256 arbitrationTokenReturn = 0;
+        uint arbitrationTokenReturn = 0;
         if (votes > 0) {
             winnersTotal = balances[resultIndex].totalVotes;
             losersTotal = 0;
@@ -338,7 +338,7 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
             arbitrationTokenReturn = votes.mul(losersTotal).div(winnersTotal).add(votes);
 
             // Add the bet token reward from arbitration to the betTokenReturn
-            uint256 rewardWon = votes.mul(betTokenReward).div(winnersTotal);
+            uint rewardWon = votes.mul(betTokenReward).div(winnersTotal);
             betTokenReturn = betTokenReturn.add(rewardWon);
         }
 
@@ -388,7 +388,7 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         );
     }
 
-    function totalAmounts() public view returns (uint256, uint256) {
+    function totalAmounts() public view returns (uint, uint) {
         return (_totalBetAmount, _totalVoteAmount);
     }
 
@@ -406,8 +406,8 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
 
     function initEventRound(
         uint8 lastResultIndex,
-        uint256 consensusThreshold,
-        uint256 arbitrationEndTime)
+        uint consensusThreshold,
+        uint arbitrationEndTime)
         private
     {
         _eventRounds.push(EventRound({
@@ -426,7 +426,7 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
     function setResult(
         address from,
         uint8 resultIndex,
-        uint256 value)
+        uint value)
         private
         inBettingStatus
         validResultIndex(resultIndex)
@@ -468,7 +468,7 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
     function vote(
         address from,
         uint8 resultIndex,
-        uint256 value)
+        uint value)
         private
         inArbitrationStatus
         validResultIndex(resultIndex)
@@ -488,8 +488,8 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         emit VotePlaced(address(this), from, resultIndex, value);
 
         // If voted over the threshold, create a new DecentralizedOracle round
-        uint256 resultVotes = _eventRounds[_currentRound].resultBalances[resultIndex].totalVotes;
-        uint256 threshold = _eventRounds[_currentRound].consensusThreshold;
+        uint resultVotes = _eventRounds[_currentRound].resultBalances[resultIndex].totalVotes;
+        uint threshold = _eventRounds[_currentRound].consensusThreshold;
         if (resultVotes >= threshold) {
             voteSetResult()
         }
@@ -502,7 +502,7 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
     function voteSetResult(
         address from,
         uint8 resultIndex,
-        uint256 value)
+        uint value)
         private
     {
         // Init next DecentralizedOracle round
@@ -531,11 +531,11 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
     }
 
     function getNextThreshold(
-        uint256 currentThreshold)
+        uint currentThreshold)
         private
-        returns (uint256)
+        returns (uint)
     {
-        uint256 increment = _thresholdPercentIncrease.mul(currentThreshold).div(100);
+        uint increment = _thresholdPercentIncrease.mul(currentThreshold).div(100);
         return currentThreshold.add(increment);
     }
 }
