@@ -29,6 +29,8 @@ contract EventFactory is NRC223Receiver {
         address indexed ownerAddress
     );
 
+    /// @dev Creates a new EventFactory.
+    /// @param configManager ConfigManager address.
     constructor(address configManager) public {
         require(configManager != address(0), "configManager address is invalid");
 
@@ -69,8 +71,7 @@ contract EventFactory is NRC223Receiver {
         }
     }
 
-    /// @dev Withdraws escrow for the sender.
-    ///      Event contracts (which are whitelisted) will call this.
+    /// @dev Withdraws escrow for the sender. Event contracts (which are whitelisted) will call this.
     /// @return Amount of escrow withdrawn.
     function withdrawEscrow() external returns (uint) {
         require(
@@ -85,10 +86,23 @@ contract EventFactory is NRC223Receiver {
         return amount;
     }
 
+    /// @dev Checks if the escrow has been withdrawn for an event.
+    /// @return If escrow has been withdrawn for an event.
     function didWithdraw() external view returns (bool) {
         return _escrows[msg.sender].didWithdraw;
     }
 
+    /// @dev Creates a new MultipleResultsEvent. Only tokenFallback can call this.
+    /// @param creator Address of the creator.
+    /// @param escrowDeposited Amount of escrow deposited to create the event.
+    /// @param eventName Question or statement prediction.
+    /// @param eventResults Possible results.
+    /// @param betStartTime Unix time when betting will start.
+    /// @param betEndTime Unix time when betting will end.
+    /// @param resultSetStartTime Unix time when the CentralizedOracle can set the result.
+    /// @param resultSetEndTime Unix time when anyone can set the result.
+    /// @param centralizedOracle Address of the user that will decide the result.
+    /// @return New MultipleResultsEvent.
     function createMultipleResultsEvent(
         address creator,
         uint escrowDeposited,
@@ -148,9 +162,18 @@ contract EventFactory is NRC223Receiver {
         return mrEvent;
     }
 
+    /// @dev Gets the hash based of the event parameters.
+    /// @param eventName Question or statement prediction.
+    /// @param eventResults Possible results.
+    /// @param numOfResults Number of results.
+    /// @param betStartTime Unix time when betting will start.
+    /// @param betEndTime Unix time when betting will end.
+    /// @param resultSetStartTime Unix time when the CentralizedOracle can set the result.
+    /// @param resultSetEndTime Unix time when anyone can set the result.
+    /// @return Hash of the event params.
     function getMultipleResultsEventHash(
-        string memory name,
-        bytes32[11] memory resultNames,
+        string memory eventName,
+        bytes32[11] memory eventResults,
         uint8 numOfResults,
         uint betStartTime,
         uint betEndTime,
@@ -161,7 +184,7 @@ contract EventFactory is NRC223Receiver {
         returns (bytes32)
     {
         return keccak256(
-            abi.encodePacked(name, resultNames, numOfResults, betStartTime, 
+            abi.encodePacked(eventName, eventResults, numOfResults, betStartTime, 
             betEndTime, resultSetStartTime, resultSetEndTime));
     }
 }

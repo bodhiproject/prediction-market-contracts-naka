@@ -109,9 +109,9 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
 
     /// @notice Creates a new StandardEvent contract.
     /// @param owner Address of the owner.
-    /// @param eventName Question or statement prediction broken down by multiple bytes32.
+    /// @param eventName Question or statement prediction.
     /// @param eventResults Possible results.
-    /// @param numOfResults Number of results for the event.
+    /// @param numOfResults Number of results.
     /// @param betStartTime Unix time when betting will start.
     /// @param betEndTime Unix time when betting will end.
     /// @param resultSetStartTime Unix time when the CentralizedOracle can set the result.
@@ -245,19 +245,18 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         require(
             block.timestamp >= _eventRounds[_currentRound].arbitrationEndTime,
             "Current time should be >= arbitrationEndTime");
+        require(!_didWithdraw[msg.sender], "Already withdrawn");
 
         // Finalize the result if not already done
         if (!_eventRounds[_currentRound].finished) {
             finalizeResult();
         }
 
-        require(!_didWithdraw[msg.sender], "Already withdrawn");
-
+        // Calculate and transfer winnings
         _didWithdraw[msg.sender] = true;
         uint betTokenAmount;
         uint voteTokenAmount;
         (betTokenAmount, voteTokenAmount) = calculateWinnings();
-
         if (betTokenAmount > 0) {
             msg.sender.transfer(betTokenAmount);
         }
@@ -265,13 +264,14 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
             INRC223(_bodhiTokenAddress).transfer(msg.sender, voteTokenAmount);
         }
 
-        // Withdraw escrow if owner
+        // Transfer escrow if owner
         uint escrowAmount = 0;
         if (msg.sender == owner
             && !IEventFactory(_eventFactoryAddress).didWithdraw()) {
             escrowAmount = IEventFactory(_eventFactoryAddress).withdrawEscrow();
         }
 
+        // Emit events
         emit WinningsWithdrawn(msg.sender, betTokenAmount, voteTokenAmount, 
             escrowAmount);
     }
