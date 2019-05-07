@@ -414,7 +414,7 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
             resultIndex: INVALID_RESULT_INDEX,
             consensusThreshold: consensusThreshold,
             arbitrationEndTime: arbitrationEndTime
-        }))
+        }));
     }
 
     /// @dev Centralized Oracle sets the result. Only tokenFallback should be calling this.
@@ -501,7 +501,7 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         uint resultVotes = _eventRounds[_currentRound].deposits[resultIndex].roundVotes;
         uint threshold = _eventRounds[_currentRound].consensusThreshold;
         if (resultVotes >= threshold) {
-            voteSetResult()
+            voteSetResult();
         }
     }
 
@@ -533,8 +533,7 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
 
     /// @dev Finalizes the result before doing a withdraw.
     function finalizeResult() {
-        _eventRounds[_currentRound].finished = true
-
+        _eventRounds[_currentRound].finished = true;
         emit FinalResultSet(address(this), _currentResultIndex, _currentRound);
     }
 
