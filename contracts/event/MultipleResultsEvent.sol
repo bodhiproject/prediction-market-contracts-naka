@@ -84,7 +84,9 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         address indexed centralizedOracle,
         uint8 resultIndex,
         uint amount,
-        uint8 eventRound
+        uint8 eventRound,
+        uint nextConsensusThreshold,
+        uint nextArbitrationEndTime
     );
     event VotePlaced(
         address indexed eventAddress,
@@ -98,7 +100,9 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         address indexed voter,
         uint8 resultIndex,
         uint amount,
-        uint8 eventRound
+        uint8 eventRound,
+        uint nextConsensusThreshold,
+        uint nextArbitrationEndTime
     );
     event FinalResultSet(
         address indexed eventAddress,
@@ -456,14 +460,17 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         _allTotals.totalVotes = _allTotals.totalVotes.add(value);
 
         // Init DecentralizedOracle round
+        uint nextThreshold = getNextThreshold(_eventRounds[0].consensusThreshold);
+        uint arbitrationEndTime = block.timestamp.add(_arbitrationLength);
         initEventRound(
             _currentRound,
             resultIndex,
-            getNextThreshold(_eventRounds[0].consensusThreshold),
-            block.timestamp.add(_arbitrationLength));
+            nextThreshold,
+            arbitrationEndTime);
 
         // Emit events
-        emit ResultSet(address(this), from, resultIndex, value, 0);
+        emit ResultSet(address(this), from, resultIndex, value, 0,
+            nextThreshold, arbitrationEndTime);
     }
 
     /// @dev Vote against the current result. Only tokenFallback should be calling this.
@@ -527,14 +534,16 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         _currentRound = _currentRound + 1;
 
         // Init next DecentralizedOracle round
+        uint arbitrationEndTime = block.timestamp.add(_arbitrationLength);
         initEventRound(
             _currentRound,
             resultIndex,
             nextThreshold,
-            block.timestamp.add(_arbitrationLength));
+            arbitrationEndTime);
 
         // Emit events
-        emit VoteResultSet(address(this), from, resultIndex, value, previousRound);
+        emit VoteResultSet(address(this), from, resultIndex, value, 
+            previousRound, nextThreshold, arbitrationEndTime);
     }
 
     /// @dev Finalizes the result before doing a withdraw.

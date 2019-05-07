@@ -3,8 +3,6 @@ const web3 = new Web3Beta(global.web3.currentProvider);
 const chai = require('chai');
 const bluebird = require('bluebird');
 const { each } = require('lodash');
-const Qweb3Utils = require('qweb3').Utils;
-const Encoder = require('qweb3').Encoder;
 
 const StandardEvent = artifacts.require('./event/StandardEvent.sol');
 const CentralizedOracle = artifacts.require('./oracle/CentralizedOracle.sol');
