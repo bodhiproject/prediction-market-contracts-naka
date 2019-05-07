@@ -1,5 +1,6 @@
 pragma solidity ^0.5.8;
 
+import "./IEventFactory.sol";
 import "../storage/IConfigManager.sol";
 import "../token/INRC223.sol";
 import "../token/NRC223Receiver.sol";
@@ -68,13 +69,13 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
     uint8 private constant INVALID_RESULT_INDEX = 255;
 
     Status private _status = Status.Betting;
-    bool private _escrowWithdrawn;
     uint8 private _numOfResults;
     uint8 private _currentRound = 0;
     uint8 private _currentResultIndex;
     string private _eventName;
     bytes32[11] private _eventResults;
     address private _bodhiTokenAddress;
+    address private _eventFactoryAddress;
     address private _centralizedOracle;
     uint256 private _betStartTime;
     uint256 private _betEndTime;
@@ -120,8 +121,9 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
     );
     event WinningsWithdrawn(
         address indexed winner,
-        uint256 betTokensAmount,
-        uint256 voteTokensAmount
+        uint betTokensAmount,
+        uint voteTokensAmount,
+        uint escrowAmount
     );
 
     // Modifiers
@@ -190,6 +192,8 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         IConfigManager configManager = IConfigManager(configManager);
         _bodhiTokenAddress = configManager.bodhiTokenAddress();
         assert(_bodhiTokenAddress != address(0));
+        _eventFactoryAddress = configManager.eventFactoryAddress();
+        assert(_eventFactoryAddress != address(0));
         _escrowAmount = configManager.eventEscrowAmount();
         _arbitrationLength = configManager.arbitrationLength();
         _arbitrationRewardPercentage = configManager.arbitrationRewardPercentage();
@@ -270,8 +274,8 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         require(!_didWithdraw[msg.sender]);
 
         didWithdraw[msg.sender] = true;
-        uint256 voteTokenAmount;
-        uint256 betTokenAmount;
+        uint voteTokenAmount;
+        uint betTokenAmount;
         (voteTokenAmount, betTokenAmount) = calculateWinnings();
 
         if (betTokenAmount > 0) {
@@ -281,21 +285,15 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
             INRC223(_bodhiTokenAddress).transfer(msg.sender, voteTokenAmount);
         }
 
-        emit WinningsWithdrawn(msg.sender, betTokenAmount, voteTokenAmount);
-    }
-
-    /// @notice Allows the owner of the Event to withdraw the escrow.
-    function withdrawEscrow() external readyToWithdraw onlyOwner {
-        // Finalize the result if not already done
-        if (_status != status.Collection) {
-            finalizeResult()
+        // Withdraw escrow if owner
+        uint escrowAmount = 0;
+        if (msg.sender == owner
+            && !IEventFactory(_eventFactoryAddress).didWithdraw()) {
+            escrowAmount = IEventFactory(_eventFactoryAddress).withdrawEscrow();
         }
 
-        require(!_escrowWithdrawn);
-
-        escrowWithdrawn = true;
-        // TODO: IronBank.withdrawEscrow()
-        // addressManager.withdrawEscrow(msg.sender, escrowAmount);
+        emit WinningsWithdrawn(msg.sender, betTokenAmount, voteTokenAmount, 
+            escrowAmount);
     }
 
     /// @notice Calculates the tokens returned based on the sender's participation.
@@ -403,7 +401,7 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
     }
 
     function didWithdrawEscrow() public view returns (bool) {
-        return _escrowWithdrawn;
+        return IEventFactory(_eventFactoryAddress).didWithdraw();
     }
 
     function initEventRound(

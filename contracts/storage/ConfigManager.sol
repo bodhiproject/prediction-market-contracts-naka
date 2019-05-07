@@ -121,6 +121,10 @@ contract ConfigManager is IConfigManager, Ownable {
         return _bodhiTokenAddress;
     }
 
+    function eventFactoryAddress() external view returns (address) {
+        return _eventFactoryAddress;
+    }
+
     function eventEscrowAmount() external view returns (uint256) {
         return _eventEscrowAmount;
     }

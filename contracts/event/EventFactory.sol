@@ -2,6 +2,7 @@ pragma solidity ^0.5.8;
 
 import "./MultipleResultsEvent.sol";
 import "../storage/IConfigManager.sol";
+import "../token/INRC223.sol";
 import "../token/NRC223Receiver.sol";
 
 /// @title Event Factory allows the creation of individual prediction events.
@@ -9,6 +10,7 @@ contract EventFactory is NRC223Receiver {
     using ByteUtils for bytes32;
 
     struct EventEscrow {
+        bool didWithdraw;
         address depositer;
         uint amount;
     }
@@ -31,7 +33,7 @@ contract EventFactory is NRC223Receiver {
     );
 
     constructor(address configManager) public {
-        require(configManager != address(0));
+        require(configManager != address(0), "configManager address is invalid.");
 
         _configManager = configManager;
         _bodhiTokenAddress = IConfigManager(_configManager).bodhiTokenAddress();
@@ -68,6 +70,24 @@ contract EventFactory is NRC223Receiver {
         } else {
             revert("Unhandled function in tokenFallback");
         }
+    }
+
+    /// @dev Withdraws escrow for the sender.
+    ///      Event contracts (which are whitelisted) will call this.
+    function withdrawEscrow() external returns (uint) {
+        require(
+            IConfigManager(_configManager).isWhitelisted(msg.sender),
+            "Sender is not whitelisted.");
+        require(!_events[msg.sender].didWithdraw, "Already withdrew escrow.");
+
+        uint amount = _events[msg.sender].amount;
+        INRC223(_bodhiTokenAddress).transfer(msg.sender, amount);
+
+        return amount;
+    }
+
+    function didWithdraw() external view returns (bool) {
+        return _events[msg.sender].didWithdraw;
     }
 
     function getMultipleResultsEventHash(
@@ -135,7 +155,7 @@ contract EventFactory is NRC223Receiver {
 
         // Store escrow entry and event
         _events[eventHash] = mrEvent;
-        _escrows[eventAddress] = EventEscrow(creator, escrowDeposited);
+        _escrows[eventAddress] = EventEscrow(false, creator, escrowDeposited);
 
         // Add to whitelist
         IConfigManager(_configManager).addToWhitelist(eventAddress);
