@@ -113,12 +113,6 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
     );
 
     // Modifiers
-    modifier readyToWithdraw() {
-        require(
-            block.timestamp >= _eventRounds[_currentRound].arbitrationEndTime,
-            "Current time should be >= arbitrationEndTime");
-        _;
-    }
     modifier validResultIndex(uint8 resultIndex) {
         require (resultIndex <= _numOfResults - 1, "resultIndex is not valid");
         _;
@@ -257,7 +251,12 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
     }
 
     /// @notice Withdraw winnings if the DecentralizedOracle round arbitrationEndTime has passed.
-    function withdraw() external readyToWithdraw {
+    function withdraw() external {
+        require(_currentRound > 0, "Cannot withdraw during betting round.");
+        require(
+            block.timestamp >= _eventRounds[_currentRound].arbitrationEndTime,
+            "Current time should be >= arbitrationEndTime");
+
         // Finalize the result if not already done
         if (!_eventRounds[_currentRound].finished) {
             finalizeResult();
