@@ -36,7 +36,7 @@ contract EventFactory {
         uint256 resultSetEndTime,
         address centralizedOracle)
         external
-        returns (MultipleResultsEvent) 
+        returns (MultipleResultsEvent)
     {   
         bytes32[11] memory results;
         uint8 numOfResults;
