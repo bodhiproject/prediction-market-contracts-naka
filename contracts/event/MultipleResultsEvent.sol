@@ -13,23 +13,13 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
     using ByteUtils for bytes32;
     using SafeMath for uint;
 
-    /// @notice Status types
-    /// Betting: Bet with the betting token.
-    /// Arbitration: Vote against previous rounds result with the arbitration token.
-    /// Collection: Winners collect their winnings.
-    enum Status {
-        Betting,
-        Arbitration,
-        Collection
-    }
-
-    // Represents the accumulated bets/votes.
+    /// @dev Represents the accumulated bets/votes.
     struct DepositTotal {
         uint totalBets;
         uint totalVotes;
     }
 
-    // Represents all the bets/votes of a result.
+    /// @dev Represents all the bets/votes of a result.
     struct RoundDeposits {
         uint roundBets;
         uint roundVotes;
@@ -37,7 +27,7 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         mapping(address => uint) votes;
     }
 
-    // Represents the aggregated bets/votes of a round.
+    /// @dev Represents the aggregated bets/votes of a round.
     struct EventRound {
         bool finished;
         uint8 lastResultIndex;
