@@ -48,8 +48,8 @@ contract EventFactory is NRC223Receiver {
         bytes calldata data)
         external
     {
-        // Ensure only NBOT can call this method
         require(msg.sender == _bodhiTokenAddress, "Only NBOT is accepted");
+        require(data.length >= 4, "Data is not long enough.");
 
         bytes memory createMultipleResultsEventFunc = hex"2b2601bf";
         bytes memory funcHash = data.sliceBytes(0, 4);
