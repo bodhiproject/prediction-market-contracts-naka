@@ -65,6 +65,12 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         uint arbitrationRewardPercentage;
     }
 
+    // Represents the bets/votes metadata for a given address.
+    struct ParticipationMetadata {
+        uint totalBets;
+        uint totalVotes;
+    }
+
     uint16 private constant VERSION = 0;
     uint8 private constant INVALID_RESULT_INDEX = 255;
 
@@ -95,29 +101,34 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         address indexed eventAddress,
         address indexed better,
         uint8 resultIndex,
-        uint amount
+        uint amount,
+        uint8 eventRound
     );
     event ResultSet(
         address indexed eventAddress,
         address indexed centralizedOracle,
         uint8 resultIndex,
-        uint amount
+        uint amount,
+        uint8 eventRound
     );
     event VotePlaced(
         address indexed eventAddress,
         address indexed voter,
         uint8 resultIndex,
-        uint amount
+        uint amount,
+        uint8 eventRound
     );
     event VoteResultSet(
         address indexed eventAddress,
         address indexed voter,
         uint8 resultIndex,
-        uint amount
+        uint amount,
+        uint8 eventRound
     );
     event FinalResultSet(
         address indexed eventAddress,
-        uint8 finalResultIndex
+        uint8 finalResultIndex,
+        uint8 eventRound
     );
     event WinningsWithdrawn(
         address indexed winner,
@@ -261,7 +272,8 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         _totalBetAmount = _totalBetAmount.add(msg.value);
 
         // Emit events
-        emit BetPlaced(address(this), msg.sender, resultIndex, msg.value);
+        emit BetPlaced(address(this), msg.sender, resultIndex, msg.value, 
+            _currentRound);
     }
 
     /// @notice Withdraw winnings if the DecentralizedOracle round arbitrationEndTime has passed.
@@ -388,6 +400,13 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         );
     }
 
+    function participationMetadata() public view returns (ParticipationMetadata) {
+        for (uint i = 0; i <= _currentRound; i++) {
+            EventRound round = _eventRounds[i];
+
+        }
+    }
+
     function totalAmounts() public view returns (uint, uint) {
         return (_totalBetAmount, _totalVoteAmount);
     }
@@ -458,7 +477,7 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
             block.timestamp.add(_arbitrationLength));
 
         // Emit events
-        emit ResultSet(address(this), from, resultIndex, value);
+        emit ResultSet(address(this), from, resultIndex, value, 0);
     }
 
     /// @dev Vote against the current result. Only tokenFallback should be calling this.
@@ -485,7 +504,7 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         _totalVoteAmount = _totalVoteAmount.add(value);
 
         // Emit events
-        emit VotePlaced(address(this), from, resultIndex, value);
+        emit VotePlaced(address(this), from, resultIndex, value, _currentRound);
 
         // If voted over the threshold, create a new DecentralizedOracle round
         uint resultVotes = _eventRounds[_currentRound].resultBalances[resultIndex].totalVotes;
@@ -511,15 +530,15 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
             getNextThreshold(_eventRounds[_currentRound].consensusThreshold),
             block.timestamp.add(_arbitrationLength));
 
+        // Emit events
+        emit VoteResultSet(address(this), from, resultIndex, value, _currentRound);
+
         // Update status and result
         _status = Status.Arbitration;
         _eventRounds[_currentRound].resultIndex = resultIndex;
         _eventRounds[_currentRound].finished = true;
         _currentResultIndex = resultIndex;
         _currentRound = _currentRound + 1;
-
-        // Emit events
-        emit VoteResultSet(address(this), from, resultIndex, value);
     }
 
     /// @dev Finalizes the result before doing a withdraw.
@@ -527,7 +546,7 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         _status = Status.Collection;
         _eventRounds[_currentRound].finished = true
 
-        emit FinalResultSet(address(this), _currentResultIndex);
+        emit FinalResultSet(address(this), _currentResultIndex, _currentRound);
     }
 
     function getNextThreshold(
