@@ -333,7 +333,7 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         return (betTokenReturn, voteTokenReturn);
     }
 
-    function version() public view returns (uint16) {
+    function version() public pure returns (uint16) {
         return VERSION;
     }
 
@@ -348,7 +348,7 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
     function eventMetadata()
         public
         view
-        returns (uint8, string memory, bytes32[11] memory, uint8)
+        returns (uint16, string memory, bytes32[11] memory, uint8)
     {
         return (
             VERSION,
