@@ -5,7 +5,7 @@ import "../storage/IConfigManager.sol";
 import "../token/INRC223.sol";
 import "../token/NRC223Receiver.sol";
 
-/// @title Event Factory allows the creation of individual prediction events.
+/// @title EventFactory allows the creation of individual prediction events.
 contract EventFactory is NRC223Receiver {
     using ByteUtils for bytes32;
 
