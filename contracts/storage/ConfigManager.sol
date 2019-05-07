@@ -20,26 +20,19 @@ contract ConfigManager is IConfigManager, Ownable {
     event EventFactoryChanged(address indexed oldAddress, address indexed newAddress);
     event ContractWhitelisted(address indexed contractAddress);
 
-    // Modifiers
-    modifier isWhitelisted(address _contractAddress) {
-        require(whitelistedContracts[_contractAddress] == true);
-        _;
-    }
-
     constructor() Ownable(msg.sender) public {
+        _whitelistedContracts[msg.sender] = true;
     }
 
-    /// @dev Adds a whitelisted contract address. Only allowed to be called from previously whitelisted addresses.
+    /// @dev Adds a whitelisted contract address.
     /// @param contractAddress The address of the contract to whitelist.
-    function addWhitelistContract(
+    function addToWhitelist(
         address contractAddress)
         external
-        onlyOwner
-        isWhitelisted(msg.sender)
         validAddress(contractAddress)
     {
+        require(_whitelistedContracts[msg.sender] == true);
         _whitelistedContracts[contractAddress] = true;
-
         emit ContractWhitelisted(contractAddress);
     }
 
@@ -146,5 +139,9 @@ contract ConfigManager is IConfigManager, Ownable {
 
     function thresholdPercentIncrease() external view returns (uint256) {
         return _thresholdPercentIncrease;
+    }
+
+    function isWhitelisted(address contractAddress) external view returns (bool) {
+        return _whitelistedContracts[contractAddress];
     }
 }

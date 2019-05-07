@@ -10,7 +10,7 @@ contract EventFactory is NRC223Receiver {
 
     struct EventEscrow {
         address depositer;
-        uint256 amount;
+        uint amount;
     }
 
     uint16 private constant VERSION = 0;
@@ -21,9 +21,6 @@ contract EventFactory is NRC223Receiver {
     mapping(bytes32 => MultipleResultsEvent) private _events;
 
     // Events
-    event EscrowDeposited(
-        address indexed newAddress
-    );
     event MultipleResultsEventCreated(
         uint16 indexed version,
         address indexed eventAddress,
@@ -60,29 +57,55 @@ contract EventFactory is NRC223Receiver {
 
         bytes32 encodedFunc = keccak256(abi.encodePacked(funcHash));
         if (encodedFunc == keccak256(abi.encodePacked(createMultipleResultsEventFunc))) {
+            // Decode data and create event
             (string memory eventName, bytes32[10] eventResults, 
-                uint256 betStartTime, uint256 betEndTime, 
-                uint256 resultSetStartTime, uint256 resultSetEndTime, 
-                address centralizedOracle) = abi.decode(params, (string, 
-                bytes32[10], uint256, uint256, uint256, uint256, address));
-            createMultipleResultsEvent(eventName, eventResults, betStartTime,
-                betEndTime, resultSetStartTime, resultSetEndTime, centralizedOracle);
+                uint betStartTime, uint betEndTime, uint resultSetStartTime,
+                uint resultSetEndTime, address centralizedOracle) = 
+                abi.decode(params, (string, bytes32[10], uint256, uint256, 
+                uint256, uint256, address));
+            createMultipleResultsEvent(from, value, eventName, eventResults, 
+                betStartTime, betEndTime, resultSetStartTime, resultSetEndTime, 
+                centralizedOracle);
         } else {
             revert("Unhandled function in tokenFallback");
         }
     }
 
+    function getMultipleResultsEventHash(
+        string name, 
+        bytes32[11] resultNames, 
+        uint8 numOfResults,
+        uint betStartTime,
+        uint betEndTime,
+        uint resultSetStartTime,
+        uint resultSetEndTime)
+        private
+        pure
+        returns (bytes32)
+    {
+        return keccak256(
+            abi.encodePacked(name, resultNames, numOfResults, betStartTime, 
+            betEndTime, resultSetStartTime, resultSetEndTime));
+    }
+
     function createMultipleResultsEvent(
+        address creator,
+        uint escrowDeposited,
         string eventName,
         bytes32[10] eventResults,
-        uint256 betStartTime,
-        uint256 betEndTime,
-        uint256 resultSetStartTime,
-        uint256 resultSetEndTime,
+        uint betStartTime,
+        uint betEndTime,
+        uint resultSetStartTime,
+        uint resultSetEndTime,
         address centralizedOracle)
         private
         returns (MultipleResultsEvent)
     {   
+        // Validate escrow amount
+        uint escrowAmount = IConfigManager(_configManager).eventEscrowAmount();
+        require(escrowDeposited >= escrowAmount, "Escrow deposit is not enough.");
+
+        // Add Invalid result to eventResults
         bytes32[11] memory results;
         uint8 numOfResults;
 
@@ -98,41 +121,26 @@ contract EventFactory is NRC223Receiver {
             }
         }
 
+        // Event should not exist yet
         bytes32 eventHash = getMultipleResultsEventHash(
             name, resultNames, numOfResults, betStartTime, betEndTime, 
             resultSetStartTime, resultSetEndTime);
-        // Event should not exist yet
         require(address(_events[eventHash]) == 0);
 
-        // TODO: NRC223.transfer() -> IronBank -> EventFactory.create
-        // IAddressManager(addressManager).transferEscrow(msg.sender);
-
+        // Create event
         MultipleResultsEvent mrEvent = new MultipleResultsEvent(
-            msg.sender, eventName, results, numOfResults, betStartTime,
+            creator, eventName, results, numOfResults, betStartTime,
             betEndTime, resultSetStartTime, resultSetEndTime, centralizedOracle, 
             _configManager);
-        _events[eventHash] = mrEvent;
 
-        emit MultipleResultsEventCreated(VERSION, address(mrEvent), msg.sender, 
-            eventName, results);
+        // Store escrow and event
+        _events[eventHash] = mrEvent;
+        _escrows[address(mrEvent)] = EventEscrow(creator, escrowDeposited);
+
+        // Emit events
+        emit MultipleResultsEventCreated(VERSION, address(mrEvent), creator, 
+            eventName, results, numOfResults);
 
         return mrEvent;
-    }
-
-    function getMultipleResultsEventHash(
-        string name, 
-        bytes32[11] resultNames, 
-        uint8 numOfResults,
-        uint256 betStartTime,
-        uint256 betEndTime,
-        uint256 resultSetStartTime,
-        uint256 resultSetEndTime)
-        private
-        pure
-        returns (bytes32)
-    {
-        return keccak256(
-            abi.encodePacked(name, resultNames, numOfResults, betStartTime, 
-            betEndTime, resultSetStartTime, resultSetEndTime));
     }
 }
