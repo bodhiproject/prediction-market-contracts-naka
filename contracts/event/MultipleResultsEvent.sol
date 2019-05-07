@@ -68,7 +68,7 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
     uint private _arbitrationRewardPercentage;
     DepositTotal private _allTotals;
     DepositTotal[11] private _resultTotals;
-    EventRound[] private _eventRounds;
+    mapping(uint8 => EventRound) private _eventRounds;
     mapping(address => bool) private _didWithdraw;
 
     // Events
@@ -185,6 +185,7 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
 
         // Init CentralizedOracle round
         initEventRound(
+            0,
             INVALID_RESULT_INDEX,
             config.startingOracleThreshold(),
             0);
@@ -297,7 +298,7 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         // Get winning bets/votes for sender
         uint bets;
         uint votes;
-        for (uint i = 0; i <= _currentRound; i++) {
+        for (uint8 i = 0; i <= _currentRound; i++) {
             bets = bets.add(
                 _eventRounds[i].deposits[_currentResultIndex].bets[msg.sender]);
             votes = votes.add(
@@ -306,7 +307,7 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
 
         // Calculate losers' bets
         uint losersTotal;
-        for (uint i = 0; i < _numOfResults; i++) {
+        for (uint8 i = 0; i < _numOfResults; i++) {
             if (i != _currentResultIndex) {
                 losersTotal = losersTotal.add(_resultTotals[i].totalBets);
             }
@@ -329,7 +330,7 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         if (votes > 0) {
             winnersTotal = _resultTotals[_currentResultIndex].totalVotes;
             losersTotal = 0;
-            for (uint i = 0; i < _numOfResults; i++) {
+            for (uint8 i = 0; i < _numOfResults; i++) {
                 if (i != _currentResultIndex) {
                     losersTotal = losersTotal.add(_resultTotals[i].totalVotes);
                 }
@@ -404,17 +405,17 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
     }
 
     function initEventRound(
+        uint8 roundIndex,
         uint8 lastResultIndex,
         uint consensusThreshold,
         uint arbitrationEndTime)
         private
     {
-        EventRound memory round;
-        round.finished = false;
-        round.lastResultIndex = lastResultIndex;
-        round.consensusThreshold = consensusThreshold;
-        round.arbitrationEndTime = arbitrationEndTime;
-        _eventRounds.push(round);
+        _eventRounds[roundIndex].finished = false;
+        _eventRounds[roundIndex].lastResultIndex = lastResultIndex;
+        _eventRounds[roundIndex].resultIndex = INVALID_RESULT_INDEX;
+        _eventRounds[roundIndex].consensusThreshold = consensusThreshold;
+        _eventRounds[roundIndex].arbitrationEndTime = arbitrationEndTime;
     }
 
     /// @dev Centralized Oracle sets the result. Only tokenFallback should be calling this.
@@ -458,6 +459,7 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
 
         // Init DecentralizedOracle round
         initEventRound(
+            _currentRound,
             resultIndex,
             getNextThreshold(_eventRounds[0].consensusThreshold),
             block.timestamp.add(_arbitrationLength));
@@ -515,20 +517,26 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         uint value)
         private
     {
-        // Init next DecentralizedOracle round
-        initEventRound(
-            resultIndex,
-            getNextThreshold(_eventRounds[_currentRound].consensusThreshold),
-            block.timestamp.add(_arbitrationLength));
-
-        // Emit events
-        emit VoteResultSet(address(this), from, resultIndex, value, _currentRound);
+        // Calculate next consensus threshold
+        uint nextThreshold =
+            getNextThreshold(_eventRounds[_currentRound].consensusThreshold);
+        uint8 previousRound = _currentRound;
 
         // Update status and result
         _eventRounds[_currentRound].resultIndex = resultIndex;
         _eventRounds[_currentRound].finished = true;
         _currentResultIndex = resultIndex;
         _currentRound = _currentRound + 1;
+
+        // Init next DecentralizedOracle round
+        initEventRound(
+            _currentRound,
+            resultIndex,
+            nextThreshold,
+            block.timestamp.add(_arbitrationLength));
+
+        // Emit events
+        emit VoteResultSet(address(this), from, resultIndex, value, previousRound);
     }
 
     /// @dev Finalizes the result before doing a withdraw.
