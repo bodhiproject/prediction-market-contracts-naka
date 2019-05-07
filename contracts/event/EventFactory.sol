@@ -72,6 +72,7 @@ contract EventFactory is NRC223Receiver {
 
     /// @dev Withdraws escrow for the sender.
     ///      Event contracts (which are whitelisted) will call this.
+    /// @return Amount of escrow withdrawn.
     function withdrawEscrow() external returns (uint) {
         require(
             IConfigManager(_configManager).isWhitelisted(msg.sender),
@@ -87,23 +88,6 @@ contract EventFactory is NRC223Receiver {
 
     function didWithdraw() external view returns (bool) {
         return _escrows[msg.sender].didWithdraw;
-    }
-
-    function getMultipleResultsEventHash(
-        string memory name,
-        bytes32[11] memory resultNames,
-        uint8 numOfResults,
-        uint betStartTime,
-        uint betEndTime,
-        uint resultSetStartTime,
-        uint resultSetEndTime)
-        private
-        pure
-        returns (bytes32)
-    {
-        return keccak256(
-            abi.encodePacked(name, resultNames, numOfResults, betStartTime, 
-            betEndTime, resultSetStartTime, resultSetEndTime));
     }
 
     function createMultipleResultsEvent(
@@ -163,5 +147,22 @@ contract EventFactory is NRC223Receiver {
         emit MultipleResultsEventCreated(VERSION, address(mrEvent), creator);
 
         return mrEvent;
+    }
+
+    function getMultipleResultsEventHash(
+        string memory name,
+        bytes32[11] memory resultNames,
+        uint8 numOfResults,
+        uint betStartTime,
+        uint betEndTime,
+        uint resultSetStartTime,
+        uint resultSetEndTime)
+        private
+        pure
+        returns (bytes32)
+    {
+        return keccak256(
+            abi.encodePacked(name, resultNames, numOfResults, betStartTime, 
+            betEndTime, resultSetStartTime, resultSetEndTime));
     }
 }
