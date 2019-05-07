@@ -25,7 +25,6 @@ contract EventFactory is NRC223Receiver {
 
     // Events
     event MultipleResultsEventCreated(
-        uint16 indexed version,
         address indexed eventAddress,
         address indexed ownerAddress
     );
@@ -144,7 +143,7 @@ contract EventFactory is NRC223Receiver {
         IConfigManager(_configManager).addToWhitelist(address(mrEvent));
 
         // Emit events
-        emit MultipleResultsEventCreated(VERSION, address(mrEvent), creator);
+        emit MultipleResultsEventCreated(address(mrEvent), creator);
 
         return mrEvent;
     }

@@ -94,11 +94,6 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         uint nextConsensusThreshold,
         uint nextArbitrationEndTime
     );
-    event FinalResultSet(
-        address indexed eventAddress,
-        uint8 finalResultIndex,
-        uint8 eventRound
-    );
     event WinningsWithdrawn(
         address indexed winner,
         uint betTokensAmount,
@@ -353,9 +348,10 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
     function eventMetadata()
         public
         view
-        returns (string memory, bytes32[11] memory, uint8)
+        returns (uint8, string memory, bytes32[11] memory, uint8)
     {
         return (
+            VERSION,
             _eventName,
             _eventResults,
             _numOfResults
@@ -539,7 +535,6 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
     /// @dev Finalizes the result before doing a withdraw.
     function finalizeResult() private {
         _eventRounds[_currentRound].finished = true;
-        emit FinalResultSet(address(this), _currentResultIndex, _currentRound);
     }
 
     function getNextThreshold(
