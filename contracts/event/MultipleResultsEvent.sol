@@ -172,7 +172,7 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         _resultSetEndTime = resultSetEndTime;
         _centralizedOracle = centralizedOracle;
 
-        // Fetch current config and set
+        // Fetch current config
         IConfigManager config = IConfigManager(configManager);
         _bodhiTokenAddress = config.bodhiTokenAddress();
         assert(_bodhiTokenAddress != address(0));
@@ -204,8 +204,8 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         bytes calldata data)
         external
     {
-        // Ensure only NBOT can call this method
         require(msg.sender == _bodhiTokenAddress, "Only NBOT is accepted");
+        require(data.length >= 4, "Data is not long enough.");
 
         bytes memory setResultFunc = hex"a6b4218b";
         bytes memory voteFunc = hex"1e00eb7f";
@@ -214,11 +214,11 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         bytes memory params = data.sliceBytes(4, data.length);
         (uint8 resultIndex) = abi.decode(params, (uint8));
 
-        bytes32 encodedFunc = keccak256(abi.encodePacked(funcHash));
-        if (encodedFunc == keccak256(abi.encodePacked(setResultFunc))) {
+        bytes32 funcCalled = keccak256(abi.encodePacked(funcHash));
+        if (funcCalled == keccak256(abi.encodePacked(setResultFunc))) {
             assert(data.length == 36);
             setResult(from, resultIndex, value);
-        } else if (encodedFunc == keccak256(abi.encodePacked(voteFunc))) {
+        } else if (funcCalled == keccak256(abi.encodePacked(voteFunc))) {
             assert(data.length == 36);
             vote(from, resultIndex, value);
         } else {
@@ -226,7 +226,7 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         }
     }
 
-    /// @notice Place a bet.
+    /// @notice Places a bet.
     /// @param resultIndex Index of result to bet on.
     function bet(
         uint8 resultIndex)
@@ -411,7 +411,6 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         uint arbitrationEndTime)
         private
     {
-        _eventRounds[roundIndex].finished = false;
         _eventRounds[roundIndex].lastResultIndex = lastResultIndex;
         _eventRounds[roundIndex].resultIndex = INVALID_RESULT_INDEX;
         _eventRounds[roundIndex].consensusThreshold = consensusThreshold;
