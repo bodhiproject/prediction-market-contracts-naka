@@ -50,7 +50,6 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
     uint16 private constant VERSION = 0;
     uint8 private constant INVALID_RESULT_INDEX = 255;
 
-    Status private _status = Status.Betting;
     uint8 private _numOfResults;
     uint8 private _currentRound = 0;
     uint8 private _currentResultIndex;
@@ -114,20 +113,14 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
     );
 
     // Modifiers
-    modifier inBettingStatus() {
-        require(_status == Status.Betting);
-        _;
-    }
-    modifier inArbitrationStatus() {
-        require(_status == Status.Arbitration);
-        _;
-    }
     modifier readyToWithdraw() {
-        require(block.timestamp >= _eventRounds[_currentRound].arbitrationEndTime);
+        require(
+            block.timestamp >= _eventRounds[_currentRound].arbitrationEndTime
+            "Current time should be >= arbitrationEndTime");
         _;
     }
     modifier validResultIndex(uint8 resultIndex) {
-        require (resultIndex <= _numOfResults - 1);
+        require (resultIndex <= _numOfResults - 1, "resultIndex is not valid");
         _;
     }
 
@@ -159,12 +152,16 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         validAddress(configManager)
     {
         bytes memory eventNameBytes = bytes(eventName);
-        require(eventNameBytes.length > 0);
-        require(!eventResults[0].isEmpty());
-        require(!eventResults[1].isEmpty());
-        require(betEndTime > betStartTime);
-        require(resultSetStartTime >= betEndTime);
-        require(resultSetEndTime > resultSetStartTime);
+        require(eventNameBytes.length > 0, "Event name cannot be empty");
+        require(!eventResults[0].isEmpty(), "Event result 0 cannot be empty");
+        require(!eventResults[1].isEmpty(), "Event result 1 cannot be empty");
+        require(betEndTime > betStartTime, "betEndTime should be > betStartTime");
+        require(
+            resultSetStartTime >= betEndTime,
+            "resultSetStartTime should be >= betEndTime");
+        require(
+            resultSetEndTime > resultSetStartTime,
+            "resultSetEndTime should be > resultSetStartTime");
 
         _eventName = eventName;
         _eventResults = eventResults;
@@ -207,7 +204,7 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         external
     {
         // Ensure only NBOT can call this method
-        require(msg.sender == _bodhiTokenAddress);
+        require(msg.sender == _bodhiTokenAddress, "Only NBOT is accepted");
 
         bytes memory setResultFunc = hex"a6b4218b";
         bytes memory voteFunc = hex"1e00eb7f";
@@ -233,12 +230,15 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         uint8 resultIndex)
         external
         payable
-        inBettingStatus
         validResultIndex(resultIndex)
     {
-        require(block.timestamp >= _betStartTime);
-        require(block.timestamp < _betEndTime);
-        require(msg.value > 0);
+        require(
+            block.timestamp >= _betStartTime,
+            "Current time should be >= betStartTime");
+        require(
+            block.timestamp < _betEndTime,
+            "Current time should be < betEndTime.");
+        require(msg.value > 0, "Bet amount should be > 0");
 
         // Update balances
         _eventRounds[0].deposits[resultIndex].roundBets =
@@ -261,7 +261,7 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
             finalizeResult()
         }
 
-        require(!_didWithdraw[msg.sender]);
+        require(!_didWithdraw[msg.sender], "Already withdrawn");
 
         didWithdraw[msg.sender] = true;
         uint betTokenAmount;
@@ -347,10 +347,6 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         return VERSION;
     }
 
-    function status() public view returns (Status) {
-        return _status;
-    }
-
     function currentRound() public view returns (uint8) {
         return _currentRound;
     }
@@ -430,17 +426,22 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         uint8 resultIndex,
         uint value)
         private
-        inBettingStatus
         validResultIndex(resultIndex)
     {
-        require(block.timestamp >= _resultSetStartTime);
+        require(!_eventRounds[0].finished, "Result has already been set");
+        require(
+            block.timestamp >= _resultSetStartTime,
+            "Current time should be >= resultSetStartTime");
         if (block.timestamp < _resultSetEndTime) {
-            require(from == _centralizedOracle);
+            require(
+                from == _centralizedOracle,
+                "Only the CentralizedOracle can set the result");
         }
-        require(value == _eventRounds[0].consensusThreshold);
+        require(
+            value == _eventRounds[0].consensusThreshold,
+            "Set result amount should = consensusThreshold");
 
         // Update status and result
-        _status = Status.Arbitration;
         _eventRounds[0].finished = true;
         _eventRounds[0].resultIndex = resultIndex;
         _currentResultIndex = resultIndex;
@@ -474,12 +475,15 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         uint8 resultIndex,
         uint value)
         private
-        inArbitrationStatus
         validResultIndex(resultIndex)
     {
-        require(block.timestamp < _eventRounds[_currentRound].arbitrationEndTime);
-        require(resultIndex != _eventRounds[_currentRound].lastResultIndex);
-        require(value > 0);
+        require(
+            block.timestamp < _eventRounds[_currentRound].arbitrationEndTime,
+            "Current time should be < arbitrationEndTime");
+        require(
+            resultIndex != _eventRounds[_currentRound].lastResultIndex,
+            "Cannot vote on the last result index");
+        require(value > 0, "Vote amount should be > 0");
 
         // Update balances
         _eventRounds[_currentRound].deposits[resultIndex].roundVotes =
@@ -521,7 +525,6 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         emit VoteResultSet(address(this), from, resultIndex, value, _currentRound);
 
         // Update status and result
-        _status = Status.Arbitration;
         _eventRounds[_currentRound].resultIndex = resultIndex;
         _eventRounds[_currentRound].finished = true;
         _currentResultIndex = resultIndex;
@@ -530,7 +533,6 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
 
     /// @dev Finalizes the result before doing a withdraw.
     function finalizeResult() {
-        _status = Status.Collection;
         _eventRounds[_currentRound].finished = true
 
         emit FinalResultSet(address(this), _currentResultIndex, _currentRound);

@@ -33,7 +33,7 @@ contract EventFactory is NRC223Receiver {
     );
 
     constructor(address configManager) public {
-        require(configManager != address(0), "configManager address is invalid.");
+        require(configManager != address(0), "configManager address is invalid");
 
         _configManager = configManager;
         _bodhiTokenAddress = IConfigManager(_configManager).bodhiTokenAddress();
@@ -51,7 +51,7 @@ contract EventFactory is NRC223Receiver {
         external
     {
         // Ensure only NBOT can call this method
-        require(msg.sender == _bodhiTokenAddress);
+        require(msg.sender == _bodhiTokenAddress, "Only NBOT is accepted");
 
         bytes memory createMultipleResultsEventFunc = hex"2b2601bf";
         bytes memory funcHash = data.sliceBytes(0, 4);
@@ -77,8 +77,8 @@ contract EventFactory is NRC223Receiver {
     function withdrawEscrow() external returns (uint) {
         require(
             IConfigManager(_configManager).isWhitelisted(msg.sender),
-            "Sender is not whitelisted.");
-        require(!_events[msg.sender].didWithdraw, "Already withdrew escrow.");
+            "Sender is not whitelisted");
+        require(!_events[msg.sender].didWithdraw, "Already withdrew escrow");
 
         uint amount = _events[msg.sender].amount;
         INRC223(_bodhiTokenAddress).transfer(msg.sender, amount);
@@ -122,7 +122,7 @@ contract EventFactory is NRC223Receiver {
     {   
         // Validate escrow amount
         uint escrowAmount = IConfigManager(_configManager).eventEscrowAmount();
-        require(escrowDeposited >= escrowAmount, "Escrow deposit is not enough.");
+        require(escrowDeposited >= escrowAmount, "Escrow deposit is not enough");
 
         // Add Invalid result to eventResults
         bytes32[11] memory results;
@@ -144,7 +144,7 @@ contract EventFactory is NRC223Receiver {
         bytes32 eventHash = getMultipleResultsEventHash(
             name, resultNames, numOfResults, betStartTime, betEndTime, 
             resultSetStartTime, resultSetEndTime);
-        require(address(_events[eventHash]) == 0);
+        require(address(_events[eventHash]) == 0, "Event already exists");
 
         // Create event
         MultipleResultsEvent mrEvent = new MultipleResultsEvent(

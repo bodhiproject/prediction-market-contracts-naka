@@ -31,7 +31,10 @@ contract ConfigManager is IConfigManager, Ownable {
         external
         validAddress(contractAddress)
     {
-        require(_whitelistedContracts[msg.sender] == true);
+        require(
+            _whitelistedContracts[msg.sender] == true,
+            "Only whitelisted addresses can add to whitelist");
+        
         _whitelistedContracts[contractAddress] = true;
         emit ContractWhitelisted(contractAddress);
     }
@@ -83,7 +86,7 @@ contract ConfigManager is IConfigManager, Ownable {
         external
         onlyOwner
     {   
-        require(newLength > 0);
+        require(newLength > 0, "newLength should be > 0");
         _arbitrationLength = newLength;
     }
 
