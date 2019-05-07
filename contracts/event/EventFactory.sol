@@ -51,13 +51,12 @@ contract EventFactory is NRC223Receiver {
         // Ensure only NBOT can call this method
         require(msg.sender == _bodhiTokenAddress);
 
-        bytes memory createMultipleResultsEventFunc = hex"8d4c17e1";
+        bytes memory createMultipleResultsEventFunc = hex"2b2601bf";
         bytes memory funcHash = data.sliceBytes(0, 4);
         bytes memory params = data.sliceBytes(4, data.length);
 
         bytes32 encodedFunc = keccak256(abi.encodePacked(funcHash));
         if (encodedFunc == keccak256(abi.encodePacked(createMultipleResultsEventFunc))) {
-            // Decode data and create event
             (string memory eventName, bytes32[10] eventResults, 
                 uint betStartTime, uint betEndTime, uint resultSetStartTime,
                 uint resultSetEndTime, address centralizedOracle) = 
@@ -134,7 +133,7 @@ contract EventFactory is NRC223Receiver {
             _configManager);
         address eventAddress = address(mrEvent);
 
-        // Store escrow and event
+        // Store escrow entry and event
         _events[eventHash] = mrEvent;
         _escrows[eventAddress] = EventEscrow(creator, escrowDeposited);
 
