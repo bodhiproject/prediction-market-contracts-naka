@@ -435,7 +435,7 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         if (block.timestamp < _resultSetEndTime) {
             require(
                 from == _centralizedOracle,
-                "Only the CentralizedOracle can set the result");
+                "Only the Centralized Oracle can set the result");
         }
         require(
             value == _eventRounds[0].consensusThreshold,
@@ -547,6 +547,7 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
     function getNextThreshold(
         uint currentThreshold)
         private
+        view
         returns (uint)
     {
         uint increment = _thresholdPercentIncrease.mul(currentThreshold).div(100);
