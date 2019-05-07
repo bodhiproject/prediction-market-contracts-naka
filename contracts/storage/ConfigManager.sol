@@ -93,7 +93,7 @@ contract ConfigManager is IConfigManager, Ownable {
     /// @dev Sets the arbitration reward percentage.
     /// @param newPercentage New percentage of the arbitration participation reward (e.g. 5)
     function setArbitrationRewardPercentage(
-        uint256 newPercentage)
+        uint8 newPercentage)
         external
         onlyOwner
     {

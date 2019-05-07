@@ -137,8 +137,8 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
     /// @param configManager Address of the ConfigManager.
     constructor(
         address owner,
-        string eventName,
-        bytes32[11] eventResults,
+        string memory eventName,
+        bytes32[11] memory eventResults,
         uint8 numOfResults,
         uint betStartTime,
         uint betEndTime,
@@ -148,7 +148,7 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         address configManager)
         Ownable(owner)
         public
-        validAddress(resultSetter)
+        validAddress(centralizedOracle)
         validAddress(configManager)
     {
         bytes memory eventNameBytes = bytes(eventName);
@@ -200,7 +200,7 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
     function tokenFallback(
         address from,
         uint value,
-        bytes data)
+        bytes calldata data)
         external
     {
         // Ensure only NBOT can call this method
@@ -264,7 +264,7 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
 
         require(!_didWithdraw[msg.sender], "Already withdrawn");
 
-        didWithdraw[msg.sender] = true;
+        _didWithdraw[msg.sender] = true;
         uint betTokenAmount;
         uint voteTokenAmount;
         (betTokenAmount, voteTokenAmount) = calculateWinnings();
@@ -306,7 +306,7 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
 
         // Calculate losers' bets
         uint losersTotal;
-        for (i = 0; i < _numOfResults; i++) {
+        for (uint i = 0; i < _numOfResults; i++) {
             if (i != _currentResultIndex) {
                 losersTotal = losersTotal.add(_resultTotals[i].totalBets);
             }
@@ -329,7 +329,7 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         if (votes > 0) {
             winnersTotal = _resultTotals[_currentResultIndex].totalVotes;
             losersTotal = 0;
-            for (i = 0; i < _numOfResults; i++) {
+            for (uint i = 0; i < _numOfResults; i++) {
                 if (i != _currentResultIndex) {
                     losersTotal = losersTotal.add(_resultTotals[i].totalVotes);
                 }
@@ -356,7 +356,11 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         return _currentResultIndex;
     }
 
-    function eventMetadata() public view returns (string, bytes32[11], uint8) {
+    function eventMetadata()
+        public
+        view
+        returns (string memory, bytes32[11] memory, uint8)
+    {
         return (
             _eventName,
             _eventResults,
@@ -387,12 +391,8 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         );
     }
 
-    function totalAmounts() public view returns (DepositTotal) {
-        return _allTotals;
-    }
-
-    function eventRounds() public view returns (EventRound[]) {
-        return _eventRounds;
+    function totalAmounts() public view returns (uint, uint) {
+        return (_allTotals.totalBets, _allTotals.totalVotes);
     }
 
     function didWithdraw() public view returns (bool) {
@@ -409,13 +409,12 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         uint arbitrationEndTime)
         private
     {
-        _eventRounds.push(EventRound({
-            finished: false,
-            lastResultIndex: lastResultIndex,
-            resultIndex: INVALID_RESULT_INDEX,
-            consensusThreshold: consensusThreshold,
-            arbitrationEndTime: arbitrationEndTime
-        }));
+        EventRound memory round;
+        round.finished = false;
+        round.lastResultIndex = lastResultIndex;
+        round.consensusThreshold = consensusThreshold;
+        round.arbitrationEndTime = arbitrationEndTime;
+        _eventRounds.push(round);
     }
 
     /// @dev Centralized Oracle sets the result. Only tokenFallback should be calling this.
@@ -502,7 +501,7 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         uint resultVotes = _eventRounds[_currentRound].deposits[resultIndex].roundVotes;
         uint threshold = _eventRounds[_currentRound].consensusThreshold;
         if (resultVotes >= threshold) {
-            voteSetResult();
+            voteSetResult(from, resultIndex, value);
         }
     }
 

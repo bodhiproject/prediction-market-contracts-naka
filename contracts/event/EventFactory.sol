@@ -7,6 +7,7 @@ import "../token/NRC223Receiver.sol";
 
 /// @title EventFactory allows the creation of individual prediction events.
 contract EventFactory is NRC223Receiver {
+    using ByteUtils for bytes;
     using ByteUtils for bytes32;
 
     struct EventEscrow {
@@ -47,7 +48,7 @@ contract EventFactory is NRC223Receiver {
     function tokenFallback(
         address from,
         uint value,
-        bytes data)
+        bytes calldata data)
         external
     {
         // Ensure only NBOT can call this method
@@ -59,7 +60,7 @@ contract EventFactory is NRC223Receiver {
 
         bytes32 encodedFunc = keccak256(abi.encodePacked(funcHash));
         if (encodedFunc == keccak256(abi.encodePacked(createMultipleResultsEventFunc))) {
-            (string memory eventName, bytes32[10] eventResults, 
+            (string memory eventName, bytes32[10] memory eventResults, 
                 uint betStartTime, uint betEndTime, uint resultSetStartTime,
                 uint resultSetEndTime, address centralizedOracle) = 
                 abi.decode(params, (string, bytes32[10], uint256, uint256, 
@@ -78,21 +79,22 @@ contract EventFactory is NRC223Receiver {
         require(
             IConfigManager(_configManager).isWhitelisted(msg.sender),
             "Sender is not whitelisted");
-        require(!_events[msg.sender].didWithdraw, "Already withdrew escrow");
+        require(!_escrows[msg.sender].didWithdraw, "Already withdrew escrow");
 
-        uint amount = _events[msg.sender].amount;
+        _escrows[msg.sender].didWithdraw = true;
+        uint amount = _escrows[msg.sender].amount;
         INRC223(_bodhiTokenAddress).transfer(msg.sender, amount);
 
         return amount;
     }
 
     function didWithdraw() external view returns (bool) {
-        return _events[msg.sender].didWithdraw;
+        return _escrows[msg.sender].didWithdraw;
     }
 
     function getMultipleResultsEventHash(
-        string name, 
-        bytes32[11] resultNames, 
+        string memory name,
+        bytes32[11] memory resultNames,
         uint8 numOfResults,
         uint betStartTime,
         uint betEndTime,
@@ -110,8 +112,8 @@ contract EventFactory is NRC223Receiver {
     function createMultipleResultsEvent(
         address creator,
         uint escrowDeposited,
-        string eventName,
-        bytes32[10] eventResults,
+        string memory eventName,
+        bytes32[10] memory eventResults,
         uint betStartTime,
         uint betEndTime,
         uint resultSetStartTime,
@@ -142,9 +144,9 @@ contract EventFactory is NRC223Receiver {
 
         // Event should not exist yet
         bytes32 eventHash = getMultipleResultsEventHash(
-            name, resultNames, numOfResults, betStartTime, betEndTime, 
+            eventName, results, numOfResults, betStartTime, betEndTime, 
             resultSetStartTime, resultSetEndTime);
-        require(address(_events[eventHash]) == 0, "Event already exists");
+        require(address(_events[eventHash]) == address(0), "Event already exists");
 
         // Create event
         MultipleResultsEvent mrEvent = new MultipleResultsEvent(
