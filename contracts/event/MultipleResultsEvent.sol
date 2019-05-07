@@ -23,10 +23,16 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         Collection
     }
 
-    // Represents all the bets/votes of a specific result.
-    struct ResultBalance {
+    // Represents the accumulated bets/votes.
+    struct DepositTotal {
         uint totalBets;
         uint totalVotes;
+    }
+
+    // Represents all the bets/votes of a result.
+    struct RoundDeposits {
+        uint roundBets;
+        uint roundVotes;
         mapping(address => uint) bets;
         mapping(address => uint) votes;
     }
@@ -38,37 +44,7 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         uint8 resultIndex;
         uint consensusThreshold;
         uint arbitrationEndTime;
-        ResultBalance[11] resultBalances;
-    }
-
-    // Represents the Event metadata.
-    struct EventMetadata {
-        string eventName;
-        bytes32[11] eventResults;
-        uint8 numOfResults;
-    }
-
-    // Represents the CentralizedOracle round metadata.
-    struct CentralizedMetadata {
-        address centralizedOracle;
-        uint betStartTime;
-        uint betEndTime;
-        uint resultSetStartTime;
-        uint resultSetEndTime;
-    }
-
-    // Represents the configuration metadata.
-    struct ConfigMetadata {
-        uint escrowAmount;
-        uint arbitrationLength;
-        uint thresholdPercentIncrease;
-        uint arbitrationRewardPercentage;
-    }
-
-    // Represents the bets/votes metadata for a given address.
-    struct ParticipationMetadata {
-        uint totalBets;
-        uint totalVotes;
+        RoundDeposits[11] deposits;
     }
 
     uint16 private constant VERSION = 0;
@@ -87,12 +63,12 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
     uint private _betEndTime;
     uint private _resultSetStartTime;
     uint private _resultSetEndTime;
-    uint private _totalBetAmount;
-    uint private _totalVoteAmount;
     uint private _escrowAmount;
     uint private _arbitrationLength;
     uint private _thresholdPercentIncrease;
     uint private _arbitrationRewardPercentage;
+    DepositTotal private _allTotals;
+    DepositTotal[11] private _resultTotals;
     EventRound[] private _eventRounds;
     mapping(address => bool) private _didWithdraw;
 
@@ -265,11 +241,13 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         require(msg.value > 0);
 
         // Update balances
-        _eventRounds[0].resultBalances[resultIndex].totalBets =
-            _eventRounds[0].resultBalances[resultIndex].totalBets.add(msg.value);
-        _eventRounds[0].resultBalances[resultIndex].bets[msg.sender] =
-            _eventRounds[0].resultBalances[resultIndex].bets[msg.sender].add(msg.value);
-        _totalBetAmount = _totalBetAmount.add(msg.value);
+        _eventRounds[0].deposits[resultIndex].roundBets =
+            _eventRounds[0].deposits[resultIndex].roundBets.add(msg.value);
+        _eventRounds[0].deposits[resultIndex].bets[msg.sender] =
+            _eventRounds[0].deposits[resultIndex].bets[msg.sender].add(msg.value);
+        _resultTotals[resultIndex].totalBets =
+            _resultTotals[resultIndex].totalBets.add(msg.value);
+        _allTotals.totalBets = _allTotals.totalBets.add(msg.value);
 
         // Emit events
         emit BetPlaced(address(this), msg.sender, resultIndex, msg.value, 
@@ -373,16 +351,20 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         return _currentResultIndex;
     }
 
-    function eventMetadata() public view returns (EventMetadata) {
-        return EventMetadata(
+    function eventMetadata() public view returns (string, bytes32[11], uint8) {
+        return (
             _eventName,
             _eventResults,
             _numOfResults
         );
     }
 
-    function centralizedMetadata() public view returns (CentralizedMetadata) {
-        return CentralizedMetadata(
+    function centralizedMetadata()
+        public
+        view
+        returns (address, uint, uint, uint, uint)
+    {
+        return (
             _centralizedOracle,
             _betStartTime,
             _betEndTime,
@@ -391,8 +373,8 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         );
     }
 
-    function configMetadata() public view returns (ConfigMetadata) {
-        return ConfigMetadata(
+    function configMetadata() public view returns (uint, uint, uint, uint) {
+        return (
             _escrowAmount,
             _arbitrationLength,
             _thresholdPercentIncrease,
@@ -400,15 +382,8 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         );
     }
 
-    function participationMetadata() public view returns (ParticipationMetadata) {
-        for (uint i = 0; i <= _currentRound; i++) {
-            EventRound round = _eventRounds[i];
-
-        }
-    }
-
-    function totalAmounts() public view returns (uint, uint) {
-        return (_totalBetAmount, _totalVoteAmount);
+    function totalAmounts() public view returns (DepositTotal) {
+        return _allTotals;
     }
 
     function eventRounds() public view returns (EventRound[]) {
@@ -464,11 +439,13 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         _currentRound = _currentRound + 1;
 
         // Update balances
-        _eventRounds[0].resultBalances[resultIndex].totalVotes =
-            _eventRounds[0].resultBalances[resultIndex].totalVotes.add(value);
-        _eventRounds[0].resultBalances[resultIndex].votes[from] =
-            _eventRounds[0].resultBalances[resultIndex].votes[from].add(value);
-        _totalVoteAmount = _totalVoteAmount.add(value);
+        _eventRounds[0].deposits[resultIndex].roundVotes =
+            _eventRounds[0].deposits[resultIndex].roundVotes.add(value);
+        _eventRounds[0].deposits[resultIndex].votes[from] =
+            _eventRounds[0].deposits[resultIndex].votes[from].add(value);
+        _resultTotals[resultIndex].totalVotes =
+            _resultTotals[resultIndex].totalVotes.add(value);
+        _allTotals.totalVotes = _allTotals.totalVotes.add(value);
 
         // Init DecentralizedOracle round
         initEventRound(
@@ -497,17 +474,19 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         require(value > 0);
 
         // Update balances
-        _eventRounds[_currentRound].resultBalances[resultIndex].totalVotes =
-            _eventRounds[_currentRound].resultBalances[resultIndex].totalVotes.add(value);
-        _eventRounds[_currentRound].resultBalances[resultIndex].votes[from] =
-            _eventRounds[_currentRound].resultBalances[resultIndex].votes[from].add(value);
-        _totalVoteAmount = _totalVoteAmount.add(value);
+        _eventRounds[_currentRound].deposits[resultIndex].roundVotes =
+            _eventRounds[_currentRound].deposits[resultIndex].roundVotes.add(value);
+        _eventRounds[_currentRound].deposits[resultIndex].votes[from] =
+            _eventRounds[_currentRound].deposits[resultIndex].votes[from].add(value);
+        _resultTotals[resultIndex].totalVotes =
+            _resultTotals[resultIndex].totalVotes.add(value);
+        _allTotals.totalVotes = _allTotals.totalVotes.add(value);
 
         // Emit events
         emit VotePlaced(address(this), from, resultIndex, value, _currentRound);
 
         // If voted over the threshold, create a new DecentralizedOracle round
-        uint resultVotes = _eventRounds[_currentRound].resultBalances[resultIndex].totalVotes;
+        uint resultVotes = _eventRounds[_currentRound].deposits[resultIndex].roundVotes;
         uint threshold = _eventRounds[_currentRound].consensusThreshold;
         if (resultVotes >= threshold) {
             voteSetResult()
