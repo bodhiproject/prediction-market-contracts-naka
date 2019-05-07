@@ -132,13 +132,17 @@ contract EventFactory is NRC223Receiver {
             creator, eventName, results, numOfResults, betStartTime,
             betEndTime, resultSetStartTime, resultSetEndTime, centralizedOracle, 
             _configManager);
+        address eventAddress = address(mrEvent);
 
         // Store escrow and event
         _events[eventHash] = mrEvent;
-        _escrows[address(mrEvent)] = EventEscrow(creator, escrowDeposited);
+        _escrows[eventAddress] = EventEscrow(creator, escrowDeposited);
+
+        // Add to whitelist
+        IConfigManager(_configManager).addToWhitelist(eventAddress);
 
         // Emit events
-        emit MultipleResultsEventCreated(VERSION, address(mrEvent), creator, 
+        emit MultipleResultsEventCreated(VERSION, eventAddress, creator, 
             eventName, results, numOfResults);
 
         return mrEvent;
