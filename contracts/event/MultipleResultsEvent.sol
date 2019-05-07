@@ -264,9 +264,9 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         require(!_didWithdraw[msg.sender]);
 
         didWithdraw[msg.sender] = true;
-        uint voteTokenAmount;
         uint betTokenAmount;
-        (voteTokenAmount, betTokenAmount) = calculateWinnings();
+        uint voteTokenAmount;
+        (betTokenAmount, voteTokenAmount) = calculateWinnings();
 
         if (betTokenAmount > 0) {
             msg.sender.transfer(betTokenAmount);
@@ -293,46 +293,54 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         view
         returns (uint, uint)
     {
-        // TODO: redo with new balance structure
-        uint votes = balances[resultIndex].votes[msg.sender];
-        uint bets = balances[resultIndex].bets[msg.sender];
+        // Get winning bets/votes for sender
+        uint bets;
+        uint votes;
+        for (uint i = 0; i <= _currentRound; i++) {
+            bets = bets.add(
+                _eventRounds[i].deposits[_currentResultIndex].bets[msg.sender]);
+            votes = votes.add(
+                _eventRounds[i].deposits[_currentResultIndex].votes[msg.sender]);
+        }
 
-        // Calculate bet token reward
-        uint losersTotal = 0;
-        for (uint8 i = 0; i < numOfResults; i++) {
-            if (i != resultIndex) {
-                losersTotal = losersTotal.add(balances[i].totalBets);
+        // Calculate losers' bets
+        uint losersTotal;
+        for (i = 0; i < _numOfResults; i++) {
+            if (i != _currentResultIndex) {
+                losersTotal = losersTotal.add(_resultTotals[i].totalBets);
             }
         }
-        uint betTokenReward = uint(ARBITRATION_REWARD_PERCENTAGE).mul(losersTotal).div(100);
+        // Subtract arbitration participation reward from losers total
+        uint betTokenReward = 
+            uint(_arbitrationRewardPercentage).mul(losersTotal).div(100);
         losersTotal = losersTotal.sub(betTokenReward);
 
         // Calculate bet token return
         uint winnersTotal;
-        uint betTokenReturn = 0;
+        uint betTokenReturn;
         if (bets > 0) {
-            winnersTotal = balances[resultIndex].totalBets;
+            winnersTotal = _resultTotals[_currentResultIndex].totalBets;
             betTokenReturn = bets.mul(losersTotal).div(winnersTotal).add(bets);
         }
 
-        // Calculate arbitration token return
-        uint arbitrationTokenReturn = 0;
+        // Calculate vote token return
+        uint voteTokenReturn;
         if (votes > 0) {
-            winnersTotal = balances[resultIndex].totalVotes;
+            winnersTotal = _resultTotals[_currentResultIndex].totalVotes;
             losersTotal = 0;
-            for (i = 0; i < numOfResults; i++) {
-                if (i != resultIndex) {
-                    losersTotal = losersTotal.add(balances[i].totalVotes);
+            for (i = 0; i < _numOfResults; i++) {
+                if (i != _currentResultIndex) {
+                    losersTotal = losersTotal.add(_resultTotals[i].totalVotes);
                 }
             }
-            arbitrationTokenReturn = votes.mul(losersTotal).div(winnersTotal).add(votes);
+            voteTokenReturn = votes.mul(losersTotal).div(winnersTotal).add(votes);
 
-            // Add the bet token reward from arbitration to the betTokenReturn
+            // Add bet token reward from arbitration to betTokenReturn
             uint rewardWon = votes.mul(betTokenReward).div(winnersTotal);
             betTokenReturn = betTokenReturn.add(rewardWon);
         }
 
-        return (arbitrationTokenReturn, betTokenReturn);
+        return (betTokenReturn, voteTokenReturn);
     }
 
     function version() public view returns (uint16) {
