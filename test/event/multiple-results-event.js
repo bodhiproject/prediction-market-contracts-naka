@@ -68,12 +68,13 @@ contract('MultipleResultsEvent', (accounts) => {
   let eventFactoryAddr
   let mrEvent
   let mrEventAddr
+  let mrEventMethods
+  let eventParams
   let escrowAmt
   let tokenDecimals
   let thresholdIncrease
   let token
   let tokenWeb3Contract
-  let eventParams
   let event
   let cOracle
   let cOracleThreshold
@@ -109,9 +110,10 @@ contract('MultipleResultsEvent', (accounts) => {
     configManagerMethods.setEventFactory(eventFactoryAddr).send({ from: OWNER })
 
     // NBOT.transfer() -> create event
+    eventParams = await getEventParams(OWNER)
     const paramsHex = web3.eth.abi.encodeParameters(
       createEventFuncTypes,
-      await getEventParams(OWNER),
+      eventParams,
     ).substr(2)
     const data = `0x${CREATE_EVENT_FUNC_SIG}${paramsHex}`
     escrowAmt = await configManagerMethods.eventEscrowAmount().call()
@@ -122,41 +124,56 @@ contract('MultipleResultsEvent', (accounts) => {
     ).send({ from: OWNER, gas: MAX_GAS })
 
     // Parse event log and instantiate event instance
-    // TODO: web3.eth.abi.decodeLog is parsing the logs backwards so it should
-    //       using eventAddress instead of ownerAddress
-    const { ownerAddress: mrEventAddr } = decodeEvent(
+    const decoded = decodeEvent(
       receipt.events,
       EventFactory._json.abi,
       'MultipleResultsEventCreated'
     )
+    // TODO: web3.eth.abi.decodeLog is parsing the logs backwards so it should
+    // using eventAddress instead of ownerAddress
+    mrEventAddr = decoded.ownerAddress
     mrEvent = await MultipleResultsEvent.at(mrEventAddr)
+    mrEventMethods = mrEvent.contract.methods
   })
 
   describe('constructor', () => {
     const resultNames = ['Invalid', 'first', 'second', 'third']
     const numOfResults = 4
 
-    it.only('initializes all the values', async () => {
-      // assert.equal(await event.owner.call(), OWNER)
-      // SolAssert.bytesStrEqual(await event.eventName.call(0), eventParams._name[0])
-      // SolAssert.bytesStrEqual(await event.eventName.call(1), eventParams._name[1])
-      // SolAssert.bytesStrEqual(await event.eventResults.call(0), RESULT_INVALID)
-      // SolAssert.bytesStrEqual(await event.eventResults.call(1), eventParams._resultNames[0])
-      // SolAssert.bytesStrEqual(await event.eventResults.call(2), eventParams._resultNames[1])
-      // SolAssert.bytesStrEqual(await event.eventResults.call(3), eventParams._resultNames[2])
-      // assert.equal((await event.numOfResults.call()).toNumber(), numOfResults)
-      // SolAssert.assertBNEqual(await event.escrowAmount.call(), await configMgr.eventEscrowAmount.call())
+    it('initializes all the values', async () => {
+      assert.equal(await mrEventMethods.owner().call(), OWNER)
+      
+      const eventMeta = await mrEventMethods.eventMetadata().call()
+      assert.equal(eventMeta[0], 0)
+      assert.equal(eventMeta[1], 'Test Event 1')
+      assert.equal(web3.utils.toUtf8(eventMeta[2][0]), RESULT_INVALID)
+      assert.equal(web3.utils.toUtf8(eventMeta[2][1]), 'A')
+      assert.equal(web3.utils.toUtf8(eventMeta[2][2]), 'B')
+      assert.equal(web3.utils.toUtf8(eventMeta[2][3]), 'C')
+      assert.equal(web3.utils.toUtf8(eventMeta[2][4]), '')
+      assert.equal(eventMeta[3], 4)
 
-      // assert.equal(await cOracle.numOfResults.call(), numOfResults)
-      // assert.equal(await cOracle.oracle.call(), eventParams._oracle)
-      // SolAssert.assertBNEqual(await cOracle.bettingStartTime.call(), eventParams._bettingStartTime)
-      // SolAssert.assertBNEqual(await cOracle.bettingEndTime.call(), eventParams._bettingEndTime)
-      // SolAssert.assertBNEqual(await cOracle.resultSettingStartTime.call(), eventParams._resultSettingStartTime)
-      // SolAssert.assertBNEqual(await cOracle.resultSettingEndTime.call(), eventParams._resultSettingEndTime)
-      // SolAssert.assertBNEqual(
-      //   await cOracle.consensusThreshold.call(),
-      //   await configMgr.startingOracleThreshold.call(),
-      // )
+      const centralizedMeta = await mrEventMethods.centralizedMetadata().call()
+      assert.equal(centralizedMeta[0], eventParams[6])
+      assert.equal(centralizedMeta[1], eventParams[2])
+      assert.equal(centralizedMeta[2], eventParams[3])
+      assert.equal(centralizedMeta[3], eventParams[4])
+      assert.equal(centralizedMeta[4], eventParams[5])
+
+      const configMeta = await mrEventMethods.configMetadata().call()
+      assert.equal(configMeta[0], escrowAmt)
+      assert.equal(
+        configMeta[1],
+        await configManagerMethods.arbitrationLength().call(),
+      )
+      assert.equal(
+        configMeta[2],
+        await configManagerMethods.thresholdPercentIncrease().call(),
+      )
+      assert.equal(
+        configMeta[3],
+        await configManagerMethods.arbitrationRewardPercentage().call(),
+      )
     })
 
     it('can handle a long name using all 10 array slots', async () => {

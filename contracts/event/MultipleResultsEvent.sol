@@ -42,7 +42,7 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
 
     uint8 private _numOfResults;
     uint8 private _currentRound = 0;
-    uint8 private _currentResultIndex;
+    uint8 private _currentResultIndex = INVALID_RESULT_INDEX;
     string private _eventName;
     bytes32[11] private _eventResults;
     address private _bodhiTokenAddress;
