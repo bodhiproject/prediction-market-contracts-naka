@@ -1,6 +1,6 @@
 const { assert } = require('chai')
 const bluebird = require('bluebird')
-const { each } = require('lodash')
+const { find, each } = require('lodash')
 const TimeMachine = require('sol-time-machine')
 const sassert = require('sol-assert')
 
@@ -8,7 +8,7 @@ const sassert = require('sol-assert')
 // const Abi = require('../util/abi')
 const getConstants = require('../constants')
 // const { EventHash, EventStatus } = require('../util/constants')
-const { toDenomination, bigNumberFloor, percentIncrease, currentBlockTime, paddedHexToAddress } = require('../util')
+const { toDenomination, bigNumberFloor, percentIncrease, currentBlockTime, paddedHexToAddress, decodeEvent } = require('../util')
 
 const NRC223PreMinted = artifacts.require('NRC223PreMinted')
 const ConfigManager = artifacts.require('ConfigManager')
@@ -66,6 +66,8 @@ contract('MultipleResultsEvent', (accounts) => {
   let configManagerMethods
   let eventFactory
   let eventFactoryAddr
+  let mrEvent
+  let mrEventAddr
   let escrowAmt
   let tokenDecimals
   let thresholdIncrease
@@ -113,11 +115,21 @@ contract('MultipleResultsEvent', (accounts) => {
     ).substr(2)
     const data = `0x${CREATE_EVENT_FUNC_SIG}${paramsHex}`
     escrowAmt = await configManagerMethods.eventEscrowAmount().call()
-    const res = await nbotMethods['transfer(address,uint256,bytes)'](
+    const receipt = await nbotMethods['transfer(address,uint256,bytes)'](
       eventFactoryAddr,
       escrowAmt,
       data,
     ).send({ from: OWNER, gas: MAX_GAS })
+
+    // Parse event log and instantiate event instance
+    // TODO: web3.eth.abi.decodeLog is parsing the logs backwards so it should
+    //       using eventAddress instead of ownerAddress
+    const { ownerAddress: mrEventAddr } = decodeEvent(
+      receipt.events,
+      EventFactory._json.abi,
+      'MultipleResultsEventCreated'
+    )
+    mrEvent = await MultipleResultsEvent.at(mrEventAddr)
   })
 
   describe('constructor', () => {

@@ -1,3 +1,5 @@
+const { find, each, isPlainObject, isArray } = require('lodash')
+
 const web3 = global.web3
 
 module.exports = class Utils {
@@ -48,5 +50,64 @@ module.exports = class Utils {
     const regex = new RegExp(/(0x)(0+)([a-fA-F0-9]{40})/)
     const matches = regex.exec(hexString)
     return matches && matches[1] + matches[3]
+  }
+
+  /**
+   * Gets the object from the ABI given the name and type
+   * @param {object} abi ABI to search in
+   * @param {string} name Name of the function or event
+   * @param {string} type One of: [function, event]
+   * @return {object|undefined} Object found in ABI
+   */
+  static getAbiObject(abi, name, type) {
+    if (!abi) return undefined;
+    return find(abi, { name, type });
+  }
+
+  /**
+   * Gets an event signature from the ABI given the name
+   * @param {object} abi ABI to search in
+   * @param {string} name Name of the function or event
+   * @return {object|undefined} Object found in ABI
+   */
+  static getEventSig(abi, name) {
+    const obj = Utils.getAbiObject(abi, name, 'event')
+    return web3.eth.abi.encodeEventSignature(obj)
+  }
+
+  static decodeEvent(events, abi, name) {
+    const obj = Utils.getAbiObject(abi, name, 'event')
+    const eventSig = Utils.getEventSig(abi, name)
+    const keys = Object.keys(events)
+
+    // Checks object's topics for the matching event signature
+    const decode = (event) => {
+      if (isPlainObject(event) && event.raw.topics.includes(eventSig)) {
+        return web3.eth.abi.decodeLog(
+          obj.inputs,
+          event.raw.data,
+          event.raw.topics,
+        )
+      }
+      return undefined
+    }
+
+    let decoded
+    each(keys, (key) => {
+      const event = events[key]
+
+      // Try to decode if event is an object
+      decoded = decode(event)
+      if (decoded) return false
+
+      // Otherwise loop through each sub-event
+      if (isArray(event)) {
+        each(event, (innerEvent) => {
+          decoded = decode(innerEvent)
+          if (decoded) return false
+        })
+      }
+    })
+    return decoded
   }
 }
