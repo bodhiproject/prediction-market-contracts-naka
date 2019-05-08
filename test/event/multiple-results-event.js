@@ -17,6 +17,8 @@ const MultipleResultsEvent = artifacts.require('MultipleResultsEvent')
 
 const web3 = global.web3
 
+const CREATE_EVENT_FUNC_SIG = '2b2601bf'
+const RESULT_INVALID = 'Invalid'
 const createEventFuncTypes = [
   'string',
   'bytes32[10]',
@@ -51,11 +53,35 @@ const getEventParams = async (cOracle) => {
   ]
 }
 
+const createEvent = async (eventParams, eventFactoryAddr, escrowAmt, owner, gas, nbotMethods) => {
+  // Construct params
+  const paramsHex = web3.eth.abi.encodeParameters(
+    createEventFuncTypes,
+    eventParams,
+  ).substr(2)
+  const data = `0x${CREATE_EVENT_FUNC_SIG}${paramsHex}`
+
+  // Send tx
+  const receipt = await nbotMethods['transfer(address,uint256,bytes)'](
+    eventFactoryAddr,
+    escrowAmt,
+    data,
+  ).send({ from: owner, gas })
+
+  // Parse event log and instantiate event instance
+  const decoded = decodeEvent(
+    receipt.events,
+    EventFactory._json.abi,
+    'MultipleResultsEventCreated'
+  )
+  // TODO: web3.eth.abi.decodeLog is parsing the logs backwards so it should
+  // using eventAddress instead of ownerAddress
+  return decoded.ownerAddress
+}
+
 contract('MultipleResultsEvent', (accounts) => {
   const { OWNER, ACCT1, ACCT2, ACCT3, ACCT4, INVALID_ADDR, MAX_GAS } = getConstants(accounts)
-  const CREATE_EVENT_FUNC_SIG = '2b2601bf'
   const BET_TOKEN_DECIMALS = 18
-  const RESULT_INVALID = 'Invalid'
   const timeMachine = new TimeMachine(web3)
 
   let nbot
@@ -100,6 +126,7 @@ contract('MultipleResultsEvent', (accounts) => {
     configManagerAddr = configManager.contract._address
     configManagerMethods = configManager.contract.methods
     configManagerMethods.setBodhiToken(nbotAddr).send({ from: OWNER })
+    escrowAmt = await configManagerMethods.eventEscrowAmount().call()
 
     // Deploy EventFactory
     eventFactory = await EventFactory.new(
@@ -111,33 +138,14 @@ contract('MultipleResultsEvent', (accounts) => {
 
     // NBOT.transfer() -> create event
     eventParams = await getEventParams(OWNER)
-    const paramsHex = web3.eth.abi.encodeParameters(
-      createEventFuncTypes,
-      eventParams,
-    ).substr(2)
-    const data = `0x${CREATE_EVENT_FUNC_SIG}${paramsHex}`
-    escrowAmt = await configManagerMethods.eventEscrowAmount().call()
-    const receipt = await nbotMethods['transfer(address,uint256,bytes)'](
-      eventFactoryAddr,
-      escrowAmt,
-      data,
-    ).send({ from: OWNER, gas: MAX_GAS })
-
-    // Parse event log and instantiate event instance
-    const decoded = decodeEvent(
-      receipt.events,
-      EventFactory._json.abi,
-      'MultipleResultsEventCreated'
-    )
-    // TODO: web3.eth.abi.decodeLog is parsing the logs backwards so it should
-    // using eventAddress instead of ownerAddress
-    mrEventAddr = decoded.ownerAddress
+    mrEventAddr = await createEvent(eventParams, eventFactoryAddr, escrowAmt, 
+      OWNER, MAX_GAS, nbotMethods)
     mrEvent = await MultipleResultsEvent.at(mrEventAddr)
     mrEventMethods = mrEvent.contract.methods
   })
 
   describe('constructor', () => {
-    const resultNames = ['Invalid', 'first', 'second', 'third']
+    const resultNames = [RESULT_INVALID, 'A', 'B', 'C']
     const numOfResults = 4
 
     it('initializes all the values', async () => {
@@ -176,149 +184,15 @@ contract('MultipleResultsEvent', (accounts) => {
       )
     })
 
-    it('can handle a long name using all 10 array slots', async () => {
-      const name = ['abcdefghijklmnopqrstuvwxyzabcdef', 'abcdefghijklmnopqrstuvwxyzabcdef',
-        'abcdefghijklmnopqrstuvwxyzabcdef', 'abcdefghijklmnopqrstuvwxyzabcdef',
-        'abcdefghijklmnopqrstuvwxyzabcdef', 'abcdefghijklmnopqrstuvwxyzabcdef',
-        'abcdefghijklmnopqrstuvwxyzabcdef', 'abcdefghijklmnopqrstuvwxyzabcdef',
-        'abcdefghijklmnopqrstuvwxyzabcdef', 'abcdefghijklmnopqrstuvwxyzabcdef']
-
-      event = await StandardEvent.new(
-        0, OWNER, eventParams._oracle, name, resultNames, numOfResults, eventParams._bettingStartTime,
-        eventParams._bettingEndTime, eventParams._resultSettingStartTime, eventParams._resultSettingEndTime,
-        configMgr.address,
-      )
-
-      SolAssert.bytesStrEqual(await event.eventName.call(0), name[0])
-      SolAssert.bytesStrEqual(await event.eventName.call(1), name[1])
-      SolAssert.bytesStrEqual(await event.eventName.call(2), name[2])
-      SolAssert.bytesStrEqual(await event.eventName.call(3), name[3])
-      SolAssert.bytesStrEqual(await event.eventName.call(4), name[4])
-      SolAssert.bytesStrEqual(await event.eventName.call(5), name[5])
-      SolAssert.bytesStrEqual(await event.eventName.call(6), name[6])
-      SolAssert.bytesStrEqual(await event.eventName.call(7), name[7])
-      SolAssert.bytesStrEqual(await event.eventName.call(8), name[8])
-      SolAssert.bytesStrEqual(await event.eventName.call(9), name[9])
+    it('throws if owner address is invalid', async () => {
+      try {
+        const params = await getEventParams(INVALID_ADDR)
+        await createEvent(eventParams, eventFactoryAddr, escrowAmt, OWNER, 
+          MAX_GAS, nbotMethods)
+      } catch (e) {
+        sassert.revert(e)
+      }
     })
-
-    // it('should only concatenate first 10 array slots of the name array', async () => {
-    //   const name = ['abcdefghijklmnopqrstuvwxyzabcdef', 'abcdefghijklmnopqrstuvwxyzabcdef',
-    //     'abcdefghijklmnopqrstuvwxyzabcdef', 'abcdefghijklmnopqrstuvwxyzabcdef',
-    //     'abcdefghijklmnopqrstuvwxyzabcdef', 'abcdefghijklmnopqrstuvwxyzabcdef',
-    //     'abcdefghijklmnopqrstuvwxyzabcdef', 'abcdefghijklmnopqrstuvwxyzabcdef',
-    //     'abcdefghijklmnopqrstuvwxyzabcdef', 'abcdefghijklmnopqrstuvwxyzabcdef',
-    //     'abcdefghijklmnopqrstuvwxyzabcdef']
-    //   event = await StandardEvent.new(
-    //     0, OWNER, eventParams._oracle, name, resultNames, numOfResults, eventParams._bettingStartTime,
-    //     eventParams._bettingEndTime, eventParams._resultSettingStartTime, eventParams._resultSettingEndTime,
-    //     configMgr.address,
-    //   )
-
-    //   SolAssert.bytesStrEqual(await event.eventName.call(0), name[0])
-    //   SolAssert.bytesStrEqual(await event.eventName.call(1), name[1])
-    //   SolAssert.bytesStrEqual(await event.eventName.call(2), name[2])
-    //   SolAssert.bytesStrEqual(await event.eventName.call(3), name[3])
-    //   SolAssert.bytesStrEqual(await event.eventName.call(4), name[4])
-    //   SolAssert.bytesStrEqual(await event.eventName.call(5), name[5])
-    //   SolAssert.bytesStrEqual(await event.eventName.call(6), name[6])
-    //   SolAssert.bytesStrEqual(await event.eventName.call(7), name[7])
-    //   SolAssert.bytesStrEqual(await event.eventName.call(8), name[8])
-    //   SolAssert.bytesStrEqual(await event.eventName.call(9), name[9])
-    // })
-
-    // it('should allow a space as the last character of a name array item', async () => {
-    //   const name = ['abcdefghijklmnopqrstuvwxyzabcde ', 'fghijklmnopqrstuvwxyz']
-    //   event = await StandardEvent.new(
-    //     0, OWNER, eventParams._oracle, name, resultNames, numOfResults, eventParams._bettingStartTime,
-    //     eventParams._bettingEndTime, eventParams._resultSettingStartTime, eventParams._resultSettingEndTime,
-    //     configMgr.address,
-    //   )
-
-    //   SolAssert.bytesStrEqual(await event.eventName.call(0), name[0])
-    //   SolAssert.bytesStrEqual(await event.eventName.call(1), name[1])
-    // })
-
-    // it(
-    //   'should allow a space as the first character if the next character is not empty in a name array item',
-    //   async () => {
-    //     const name = ['abcdefghijklmnopqrstuvwxyzabcdef', ' ghijklmnopqrstuvwxyz']
-    //     event = await StandardEvent.new(
-    //       0, OWNER, eventParams._oracle, name, resultNames, numOfResults, eventParams._bettingStartTime,
-    //       eventParams._bettingEndTime, eventParams._resultSettingStartTime, eventParams._resultSettingEndTime,
-    //       configMgr.address,
-    //     )
-
-    //     SolAssert.bytesStrEqual(await event.eventName.call(0), name[0])
-    //     SolAssert.bytesStrEqual(await event.eventName.call(1), name[1])
-    //   },
-    // )
-
-    // it('can handle using all 11 results', async () => {
-    //   const results = [RESULT_INVALID, 'first', 'second', 'third', 'fourth', 'fifth', 'sixth', 'seventh', 'eighth',
-    //     'ninth', 'ten']
-    //   event = await StandardEvent.new(
-    //     0, OWNER, eventParams._oracle, eventParams._name, results, 11,
-    //     eventParams._bettingStartTime, eventParams._bettingEndTime,
-    //     eventParams._resultSettingStartTime, eventParams._resultSettingEndTime,
-    //     configMgr.address,
-    //   )
-
-    //   SolAssert.bytesStrEqual(await event.eventResults.call(0), results[0])
-    //   SolAssert.bytesStrEqual(await event.eventResults.call(1), results[1])
-    //   SolAssert.bytesStrEqual(await event.eventResults.call(2), results[2])
-    //   SolAssert.bytesStrEqual(await event.eventResults.call(3), results[3])
-    //   SolAssert.bytesStrEqual(await event.eventResults.call(4), results[4])
-    //   SolAssert.bytesStrEqual(await event.eventResults.call(5), results[5])
-    //   SolAssert.bytesStrEqual(await event.eventResults.call(6), results[6])
-    //   SolAssert.bytesStrEqual(await event.eventResults.call(7), results[7])
-    //   SolAssert.bytesStrEqual(await event.eventResults.call(8), results[8])
-    //   SolAssert.bytesStrEqual(await event.eventResults.call(9), results[9])
-    //   SolAssert.bytesStrEqual(await event.eventResults.call(10), results[10])
-    // })
-
-    // it('should only set the first 10 results', async () => {
-    //   const results = [RESULT_INVALID, 'first', 'second', 'third', 'fourth', 'fifth', 'sixth', 'seventh', 'eighth',
-    //     'ninth', 'ten', 'eleven']
-    //   event = await StandardEvent.new(
-    //     0, OWNER, eventParams._oracle, eventParams._name, results, 11,
-    //     eventParams._bettingStartTime, eventParams._bettingEndTime,
-    //     eventParams._resultSettingStartTime, eventParams._resultSettingEndTime,
-    //     configMgr.address,
-    //   )
-
-    //   SolAssert.bytesStrEqual(await event.eventResults.call(0), results[0])
-    //   SolAssert.bytesStrEqual(await event.eventResults.call(1), results[1])
-    //   SolAssert.bytesStrEqual(await event.eventResults.call(2), results[2])
-    //   SolAssert.bytesStrEqual(await event.eventResults.call(3), results[3])
-    //   SolAssert.bytesStrEqual(await event.eventResults.call(4), results[4])
-    //   SolAssert.bytesStrEqual(await event.eventResults.call(5), results[5])
-    //   SolAssert.bytesStrEqual(await event.eventResults.call(6), results[6])
-    //   SolAssert.bytesStrEqual(await event.eventResults.call(7), results[7])
-    //   SolAssert.bytesStrEqual(await event.eventResults.call(8), results[8])
-    //   SolAssert.bytesStrEqual(await event.eventResults.call(9), results[9])
-    //   SolAssert.bytesStrEqual(await event.eventResults.call(10), results[10])
-
-    //   try {
-    //     await event.eventResults.call(11)
-    //     assert.fail()
-    //   } catch (e) {
-    //     SolAssert.assertInvalidOpcode(e)
-    //   }
-    // })
-
-    // it('throws if owner address is invalid', async () => {
-    //   try {
-    //     await StandardEvent.new(
-    //       0, 0, eventParams._oracle, eventParams._name, eventParams._resultNames, numOfResults,
-    //       eventParams._bettingStartTime, eventParams._bettingEndTime,
-    //       eventParams._resultSettingStartTime, eventParams._resultSettingEndTime,
-    //       configMgr.address,
-    //     )
-    //     assert.fail()
-    //   } catch (e) {
-    //     SolAssert.assertRevert(e)
-    //   }
-    // })
 
     // it('throws if oracle address is invalid', async () => {
     //   try {
