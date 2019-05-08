@@ -8,7 +8,7 @@ const sassert = require('sol-assert')
 // const Abi = require('../util/abi')
 const getConstants = require('../constants')
 // const { EventHash, EventStatus } = require('../util/constants')
-// const { toDenomination, bigNumberFloor, percentIncrease, currentBlockTime, paddedHexToAddress } = require('../util')
+const { toDenomination, bigNumberFloor, percentIncrease, currentBlockTime, paddedHexToAddress } = require('../util')
 
 const NRC223PreMinted = artifacts.require('NRC223PreMinted')
 const ConfigManager = artifacts.require('ConfigManager')
@@ -17,27 +17,50 @@ const MultipleResultsEvent = artifacts.require('MultipleResultsEvent')
 
 const web3 = global.web3
 
-// const getEventParams = (oracle) => {
-//   const currTime = currentBlockTime()
-//   return {
-//     _oracle: oracle,
-//     _name: 'Will Apple stock reach $300 by the end of 2017?',
-//     _resultNames: ['A', 'B', 'C'],
-//     _bettingStartTime: currTime + 1000,
-//     _bettingEndTime: currTime + 3000,
-//     _resultSettingStartTime: currTime + 4000,
-//     _resultSettingEndTime: currTime + 6000,
-//   }
-// }
+const createEventFuncTypes = [
+  'string',
+  'bytes32[10]',
+  'uint256',
+  'uint256',
+  'uint256',
+  'uint256',
+  'address',
+]
+
+const getEventParams = async (cOracle) => {
+  const currTime = await currentBlockTime()
+  return [
+    'Test Event 1',
+    [
+      web3.utils.fromAscii('A'),
+      web3.utils.fromAscii('B'),
+      web3.utils.fromAscii('C'),
+      web3.utils.fromAscii(''),
+      web3.utils.fromAscii(''),
+      web3.utils.fromAscii(''),
+      web3.utils.fromAscii(''),
+      web3.utils.fromAscii(''),
+      web3.utils.fromAscii(''),
+      web3.utils.fromAscii(''),
+    ],
+    `${currTime + 1000}`,
+    `${currTime + 3000}`,
+    `${currTime + 4000}`,
+    `${currTime + 6000}`,
+    cOracle,
+  ]
+}
 
 contract('MultipleResultsEvent', (accounts) => {
   const { OWNER, ACCT1, ACCT2, ACCT3, ACCT4, INVALID_ADDR, MAX_GAS } = getConstants(accounts)
+  const CREATE_EVENT_FUNC_SIG = '2b2601bf'
   const BET_TOKEN_DECIMALS = 18
   const RESULT_INVALID = 'Invalid'
   const timeMachine = new TimeMachine(web3)
 
   let nbot
   let nbotAddr
+  let nbotMethods
   let configManager
   let configManagerAddr
   let eventFactory
@@ -66,6 +89,8 @@ contract('MultipleResultsEvent', (accounts) => {
       OWNER,
       { from: OWNER, gas: MAX_GAS })
     nbotAddr = nbot.contract._address
+    nbotMethods = nbot.contract.methods
+		console.log('NAKA: nbotMethods', nbotMethods)
 
     // Deploy ConfigManager
     configManager = await ConfigManager.new({ from: OWNER, gas: MAX_GAS })
@@ -80,6 +105,14 @@ contract('MultipleResultsEvent', (accounts) => {
     eventFactoryAddr = eventFactory.contract._address
     configManager.contract.methods.setEventFactory(eventFactoryAddr).send({ from: OWNER })
 
+    // Call NBOT.transfer -> create event
+    const paramsHex = web3.eth.abi.encodeParameters(
+      createEventFuncTypes,
+      await getEventParams(OWNER),
+    ).substr(2)
+    const data = `0x${CREATE_EVENT_FUNC_SIG}${paramsHex}`
+    console.log('encoded data:', data)
+    
     
 
 

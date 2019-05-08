@@ -1,4 +1,4 @@
-const web3 = global.web3;
+const web3 = global.web3
 
 module.exports = class Utils {
   /*
@@ -9,9 +9,9 @@ module.exports = class Utils {
   * @retun {BigNumber} The converted BigNumber.
   */
   static toDenomination(number, decimals = 0) {
-    const bn = web3.toBigNumber(number);
-    const decimalsBn = web3.toBigNumber(10 ** decimals);
-    return bn.times(decimalsBn);
+    const bn = web3.toBigNumber(number)
+    const decimalsBn = web3.toBigNumber(10 ** decimals)
+    return bn.times(decimalsBn)
   }
 
   /*
@@ -20,7 +20,7 @@ module.exports = class Utils {
   * @retun {BigNumber} The truncated BigNumber.
   */
   static bigNumberFloor(bigNumber) {
-    return web3.toBigNumber(bigNumber.toString().split('.')[0]);
+    return web3.toBigNumber(bigNumber.toString().split('.')[0])
   }
 
   /*
@@ -30,12 +30,12 @@ module.exports = class Utils {
   * @retun {BigNumber} The increased BigNumber by the percentage.
   */
   static percentIncrease(bigNumber, percentage) {
-    return bigNumber.times(web3.toBigNumber(percentage)).div(web3.toBigNumber(100)).plus(bigNumber);
+    return bigNumber.times(web3.toBigNumber(percentage)).div(web3.toBigNumber(100)).plus(bigNumber)
   }
 
   // Gets the unix time in seconds of the current block
-  static currentBlockTime() {
-    return web3.eth.getBlock(web3.eth.blockNumber).timestamp;
+  static async currentBlockTime() {
+    return (await web3.eth.getBlock(web3.eth.blockNumber)).timestamp
   }
 
   /*
@@ -45,8 +45,8 @@ module.exports = class Utils {
   * @return {string} The hex string with the padded zeros removed.
   */
   static paddedHexToAddress(hexString) {
-    const regex = new RegExp(/(0x)(0+)([a-fA-F0-9]{40})/);
-    const matches = regex.exec(hexString);
-    return matches && matches[1] + matches[3];
+    const regex = new RegExp(/(0x)(0+)([a-fA-F0-9]{40})/)
+    const matches = regex.exec(hexString)
+    return matches && matches[1] + matches[3]
   }
-};
+}
