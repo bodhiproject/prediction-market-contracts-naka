@@ -63,8 +63,11 @@ contract('MultipleResultsEvent', (accounts) => {
   let nbotMethods
   let configManager
   let configManagerAddr
+  let configManagerMethods
   let eventFactory
   let eventFactoryAddr
+
+  let escrowAmt
 
   let tokenDecimals
   let thresholdIncrease
@@ -90,12 +93,12 @@ contract('MultipleResultsEvent', (accounts) => {
       { from: OWNER, gas: MAX_GAS })
     nbotAddr = nbot.contract._address
     nbotMethods = nbot.contract.methods
-		console.log('NAKA: nbotMethods', nbotMethods)
 
     // Deploy ConfigManager
     configManager = await ConfigManager.new({ from: OWNER, gas: MAX_GAS })
     configManagerAddr = configManager.contract._address
-    configManager.contract.methods.setBodhiToken(nbotAddr).send({ from: OWNER })
+    configManagerMethods = configManager.contract.methods
+    configManagerMethods.setBodhiToken(nbotAddr).send({ from: OWNER })
 
     // Deploy EventFactory
     eventFactory = await EventFactory.new(
@@ -103,7 +106,7 @@ contract('MultipleResultsEvent', (accounts) => {
       { from: OWNER, gas: MAX_GAS },
     )
     eventFactoryAddr = eventFactory.contract._address
-    configManager.contract.methods.setEventFactory(eventFactoryAddr).send({ from: OWNER })
+    configManagerMethods.setEventFactory(eventFactoryAddr).send({ from: OWNER })
 
     // Call NBOT.transfer -> create event
     const paramsHex = web3.eth.abi.encodeParameters(
@@ -111,42 +114,15 @@ contract('MultipleResultsEvent', (accounts) => {
       await getEventParams(OWNER),
     ).substr(2)
     const data = `0x${CREATE_EVENT_FUNC_SIG}${paramsHex}`
-    console.log('encoded data:', data)
+		console.log('NAKA: data', data)
     
-    
-
-
-    // const baseContracts = await ContractHelper.initBaseContracts(OWNER, accounts)
-    // configMgr = baseContracts.configMgr
-    // tokenDecimals = await configMgr.tokenDecimals.call()
-    // thresholdIncrease = await configMgr.thresholdPercentIncrease.call()
-
-    // token = baseContracts.bodhiToken
-    // tokenWeb3Contract = new web3.eth.Contract(Abi.BodhiEthereum, token.address)
-    
-    // const eventFactory = baseContracts.eventFactory
-    // eventParams = getEventParams(OWNER)
-    // const tx = await eventFactory.createStandardEvent(...Object.values(eventParams), { from: OWNER })
-    // SolAssert.assertEvent(tx, 'StandardEventCreated')
-
-    // let eventAddress
-    // let cOracleAddress
-    // each(tx.receipt.logs, (log) => {
-    //   if (log.topics[0] === EventHash.STANDARD_EVENT_CREATED) {
-    //     eventAddress = paddedHexToAddress(log.topics[2])
-    //   } else if (log.topics[0] === EventHash.CENTRALIZED_ORACLE_CREATED) {
-    //     cOracleAddress = paddedHexToAddress(log.topics[2])
-    //   }
-    // })
-
-    // event = await StandardEvent.at(eventAddress)
-    // assert.isDefined(event)
-
-    // cOracle = await CentralizedOracle.at(cOracleAddress)
-    // assert.isDefined(cOracle)
-    // cOracleThreshold = await cOracle.consensusThreshold.call()
-
-    // dOracle = undefined
+    escrowAmt = await configManagerMethods.eventEscrowAmount().call()
+    const res = await nbotMethods['transfer(address,uint256,bytes)'](
+      eventFactoryAddr, 
+      escrowAmt,
+      data,
+    ).send({ from: OWNER, gas: MAX_GAS })
+    console.log('NAKA: res', res)
   })
 
   describe('constructor', () => {
