@@ -43,7 +43,7 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
     uint8 private _numOfResults;
     uint8 private _currentRound = 0;
     uint8 private _currentResultIndex;
-    string private _eventName;
+    bytes32[10] private _eventName;
     bytes32[11] private _eventResults;
     address private _bodhiTokenAddress;
     address private _eventFactoryAddress;
@@ -120,7 +120,7 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
     /// @param configManager Address of the ConfigManager.
     constructor(
         address owner,
-        string memory eventName,
+        bytes32[10] memory eventName,
         bytes32[11] memory eventResults,
         uint8 numOfResults,
         uint betStartTime,
@@ -134,8 +134,7 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         validAddress(centralizedOracle)
         validAddress(configManager)
     {
-        bytes memory eventNameBytes = bytes(eventName);
-        require(eventNameBytes.length > 0, "Event name cannot be empty");
+        require(!eventName[0].isEmpty(), "Event name 0 cannot be empty");
         require(!eventResults[0].isEmpty(), "Event result 0 cannot be empty");
         require(!eventResults[1].isEmpty(), "Event result 1 cannot be empty");
         require(betEndTime > betStartTime, "betEndTime should be > betStartTime");
@@ -348,7 +347,7 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
     function eventMetadata()
         public
         view
-        returns (uint16, string memory, bytes32[11] memory, uint8)
+        returns (uint16, bytes32[10] memory, bytes32[11] memory, uint8)
     {
         return (
             VERSION,

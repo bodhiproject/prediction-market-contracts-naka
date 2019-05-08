@@ -58,10 +58,10 @@ contract EventFactory is NRC223Receiver {
 
         bytes32 encodedFunc = keccak256(abi.encodePacked(funcHash));
         if (encodedFunc == keccak256(abi.encodePacked(createMultipleResultsEventFunc))) {
-            (string memory eventName, bytes32[10] memory eventResults, 
+            (bytes32[10] memory eventName, bytes32[10] memory eventResults, 
                 uint betStartTime, uint betEndTime, uint resultSetStartTime,
                 uint resultSetEndTime, address centralizedOracle) = 
-                abi.decode(params, (string, bytes32[10], uint256, uint256, 
+                abi.decode(params, (bytes32[10], bytes32[10], uint256, uint256, 
                 uint256, uint256, address));
             createMultipleResultsEvent(from, value, eventName, eventResults, 
                 betStartTime, betEndTime, resultSetStartTime, resultSetEndTime, 
@@ -106,7 +106,7 @@ contract EventFactory is NRC223Receiver {
     function createMultipleResultsEvent(
         address creator,
         uint escrowDeposited,
-        string memory eventName,
+        bytes32[10] memory eventName,
         bytes32[10] memory eventResults,
         uint betStartTime,
         uint betEndTime,
@@ -172,7 +172,7 @@ contract EventFactory is NRC223Receiver {
     /// @param resultSetEndTime Unix time when anyone can set the result.
     /// @return Hash of the event params.
     function getMultipleResultsEventHash(
-        string memory eventName,
+        bytes32[10] memory eventName,
         bytes32[11] memory eventResults,
         uint8 numOfResults,
         uint betStartTime,

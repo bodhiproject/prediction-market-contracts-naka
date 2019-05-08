@@ -18,7 +18,7 @@ const MultipleResultsEvent = artifacts.require('MultipleResultsEvent')
 const web3 = global.web3
 
 const createEventFuncTypes = [
-  'string',
+  'bytes32[10]',
   'bytes32[10]',
   'uint256',
   'uint256',
@@ -30,7 +30,18 @@ const createEventFuncTypes = [
 const getEventParams = async (cOracle) => {
   const currTime = await currentBlockTime()
   return [
-    'Test Event 1',
+    [
+      web3.utils.fromAscii('Test Event 1'),
+      web3.utils.fromAscii(''),
+      web3.utils.fromAscii(''),
+      web3.utils.fromAscii(''),
+      web3.utils.fromAscii(''),
+      web3.utils.fromAscii(''),
+      web3.utils.fromAscii(''),
+      web3.utils.fromAscii(''),
+      web3.utils.fromAscii(''),
+      web3.utils.fromAscii(''),
+    ],
     [
       web3.utils.fromAscii('A'),
       web3.utils.fromAscii('B'),
@@ -66,9 +77,7 @@ contract('MultipleResultsEvent', (accounts) => {
   let configManagerMethods
   let eventFactory
   let eventFactoryAddr
-
   let escrowAmt
-
   let tokenDecimals
   let thresholdIncrease
   let token
@@ -108,17 +117,16 @@ contract('MultipleResultsEvent', (accounts) => {
     eventFactoryAddr = eventFactory.contract._address
     configManagerMethods.setEventFactory(eventFactoryAddr).send({ from: OWNER })
 
-    // Call NBOT.transfer -> create event
+    // NBOT.transfer() -> create event
     const paramsHex = web3.eth.abi.encodeParameters(
       createEventFuncTypes,
       await getEventParams(OWNER),
     ).substr(2)
     const data = `0x${CREATE_EVENT_FUNC_SIG}${paramsHex}`
 		console.log('NAKA: data', data)
-    
     escrowAmt = await configManagerMethods.eventEscrowAmount().call()
     const res = await nbotMethods['transfer(address,uint256,bytes)'](
-      eventFactoryAddr, 
+      eventFactoryAddr,
       escrowAmt,
       data,
     ).send({ from: OWNER, gas: MAX_GAS })
