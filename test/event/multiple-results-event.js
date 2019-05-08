@@ -53,30 +53,41 @@ const getEventParams = async (cOracle) => {
   ]
 }
 
-const createEvent = async (eventParams, eventFactoryAddr, escrowAmt, owner, gas, nbotMethods) => {
-  // Construct params
-  const paramsHex = web3.eth.abi.encodeParameters(
-    createEventFuncTypes,
-    eventParams,
-  ).substr(2)
-  const data = `0x${CREATE_EVENT_FUNC_SIG}${paramsHex}`
+const createEvent = async ({
+  nbotMethods,
+  eventParams,
+  eventFactoryAddr,
+  escrowAmt,
+  from,
+  gas,
+}) => {
+  try {
+    // Construct params
+    const paramsHex = web3.eth.abi.encodeParameters(
+      createEventFuncTypes,
+      eventParams,
+    ).substr(2)
+    const data = `0x${CREATE_EVENT_FUNC_SIG}${paramsHex}`
 
-  // Send tx
-  const receipt = await nbotMethods['transfer(address,uint256,bytes)'](
-    eventFactoryAddr,
-    escrowAmt,
-    data,
-  ).send({ from: owner, gas })
-
-  // Parse event log and instantiate event instance
-  const decoded = decodeEvent(
-    receipt.events,
-    EventFactory._json.abi,
-    'MultipleResultsEventCreated'
-  )
-  // TODO: web3.eth.abi.decodeLog is parsing the logs backwards so it should
-  // using eventAddress instead of ownerAddress
-  return decoded.ownerAddress
+    // Send tx
+    const receipt = await nbotMethods['transfer(address,uint256,bytes)'](
+      eventFactoryAddr,
+      escrowAmt,
+      data,
+    ).send({ from, gas })
+  
+    // Parse event log and instantiate event instance
+    const decoded = decodeEvent(
+      receipt.events,
+      EventFactory._json.abi,
+      'MultipleResultsEventCreated'
+    )
+    // TODO: web3.eth.abi.decodeLog is parsing the logs backwards so it should
+    // using eventAddress instead of ownerAddress
+    return decoded.ownerAddress
+  } catch (err) {
+    throw err
+  }
 }
 
 contract('MultipleResultsEvent', (accounts) => {
@@ -97,14 +108,6 @@ contract('MultipleResultsEvent', (accounts) => {
   let mrEventMethods
   let eventParams
   let escrowAmt
-  let tokenDecimals
-  let thresholdIncrease
-  let token
-  let tokenWeb3Contract
-  let event
-  let cOracle
-  let cOracleThreshold
-  let dOracle
 
   beforeEach(timeMachine.snapshot)
   afterEach(timeMachine.revert)
@@ -138,8 +141,14 @@ contract('MultipleResultsEvent', (accounts) => {
 
     // NBOT.transfer() -> create event
     eventParams = await getEventParams(OWNER)
-    mrEventAddr = await createEvent(eventParams, eventFactoryAddr, escrowAmt, 
-      OWNER, MAX_GAS, nbotMethods)
+    mrEventAddr = await createEvent({
+      nbotMethods,
+      eventParams,
+      eventFactoryAddr,
+      escrowAmt, 
+      from: OWNER,
+      gas: MAX_GAS,
+    })
     mrEvent = await MultipleResultsEvent.at(mrEventAddr)
     mrEventMethods = mrEvent.contract.methods
   })
@@ -184,133 +193,149 @@ contract('MultipleResultsEvent', (accounts) => {
       )
     })
 
-    it('throws if owner address is invalid', async () => {
+    it('throws if centralizedOracle address is invalid', async () => {
       try {
         const params = await getEventParams(INVALID_ADDR)
-        await createEvent(eventParams, eventFactoryAddr, escrowAmt, OWNER, 
-          MAX_GAS, nbotMethods)
+        params[0] = 'Test Event 2'
+        await createEvent({
+          nbotMethods,
+          eventParams: params,
+          eventFactoryAddr,
+          escrowAmt,
+          from: OWNER, 
+          gas: MAX_GAS,
+        })
       } catch (e) {
         sassert.revert(e)
       }
     })
 
-    // it('throws if oracle address is invalid', async () => {
-    //   try {
-    //     await StandardEvent.new(
-    //       0, OWNER, 0, eventParams._name, eventParams._resultNames, numOfResults, eventParams._bettingStartTime,
-    //       eventParams._bettingEndTime, eventParams._resultSettingStartTime, eventParams._resultSettingEndTime,
-    //       configMgr.address,
-    //     )
-    //     assert.fail()
-    //   } catch (e) {
-    //     SolAssert.assertRevert(e)
-    //   }
-    // })
+    it('throws if eventName is empty', async () => {
+      try {
+        const params = await getEventParams(OWNER)
+        params[0] = ''
+        await createEvent({
+          nbotMethods,
+          eventParams: params,
+          eventFactoryAddr,
+          escrowAmt,
+          from: OWNER, 
+          gas: MAX_GAS,
+        })
+      } catch (e) {
+        sassert.revert(e, 'Event name cannot be empty')
+      }
+    })
 
-    // it('throws if AddressManager address is invalid', async () => {
-    //   try {
-    //     await StandardEvent.new(
-    //       0, OWNER, eventParams._centralizedOracle, eventParams._name, eventParams._resultNames, numOfResults,
-    //       eventParams._bettingStartTime, eventParams._bettingEndTime, eventParams._resultSettingStartTime,
-    //       eventParams._resultSettingEndTime, 0,
-    //     )
-    //     assert.fail()
-    //   } catch (e) {
-    //     SolAssert.assertRevert(e)
-    //   }
-    // })
+    it('throws if eventResults 0 or 1 are empty', async () => {
+      try {
+        const params = await getEventParams(OWNER)
+        params[0] = 'Test Event 3'
+        params[1] = [
+          web3.utils.fromAscii(''),
+          web3.utils.fromAscii('B'),
+          web3.utils.fromAscii('C'),
+          web3.utils.fromAscii(''),
+          web3.utils.fromAscii(''),
+          web3.utils.fromAscii(''),
+          web3.utils.fromAscii(''),
+          web3.utils.fromAscii(''),
+          web3.utils.fromAscii(''),
+          web3.utils.fromAscii(''),
+        ]
+        await createEvent({
+          nbotMethods,
+          eventParams: params,
+          eventFactoryAddr,
+          escrowAmt,
+          from: OWNER, 
+          gas: MAX_GAS,
+        })
+      } catch (e) {
+        sassert.revert(e, 'First event result cannot be empty')
+      }
 
-    // it('throws if name is empty', async () => {
-    //   try {
-    //     await StandardEvent.new(
-    //       0, OWNER, eventParams._centralizedOracle, [], eventParams._resultNames, numOfResults,
-    //       eventParams._bettingStartTime, eventParams._bettingEndTime,
-    //       eventParams._resultSettingStartTime, eventParams._resultSettingEndTime,
-    //       configMgr.address,
-    //     )
-    //     assert.fail()
-    //   } catch (e) {
-    //     SolAssert.assertRevert(e)
-    //   }
-    // })
+      try {
+        const params = await getEventParams(OWNER)
+        params[0] = 'Test Event 4'
+        params[1] = [
+          web3.utils.fromAscii('A'),
+          web3.utils.fromAscii(''),
+          web3.utils.fromAscii(''),
+          web3.utils.fromAscii(''),
+          web3.utils.fromAscii(''),
+          web3.utils.fromAscii(''),
+          web3.utils.fromAscii(''),
+          web3.utils.fromAscii(''),
+          web3.utils.fromAscii(''),
+          web3.utils.fromAscii(''),
+        ]
+        await createEvent({
+          nbotMethods,
+          eventParams: params,
+          eventFactoryAddr,
+          escrowAmt,
+          from: OWNER, 
+          gas: MAX_GAS,
+        })
+      } catch (e) {
+        sassert.revert(e, 'Second event result cannot be empty')
+      }
+    })
 
-    // it('throws if eventResults 0 or 1 are empty', async () => {
-    //   try {
-    //     await StandardEvent.new(
-    //       0, OWNER, eventParams._centralizedOracle, eventParams._name, [], 1,
-    //       eventParams._bettingStartTime, eventParams._bettingEndTime,
-    //       eventParams._resultSettingStartTime, eventParams._resultSettingEndTime,
-    //       configMgr.address,
-    //     )
-    //     assert.fail()
-    //   } catch (e) {
-    //     SolAssert.assertRevert(e)
-    //   }
+    it('throws if betEndTime is <= betStartTime', async () => {
+      try {
+        const params = await getEventParams(OWNER)
+        params[0] = 'Test Event 5'
+        params[3] = params[2]
+        await createEvent({
+          nbotMethods,
+          eventParams: params,
+          eventFactoryAddr,
+          escrowAmt,
+          from: OWNER, 
+          gas: MAX_GAS,
+        })
+      } catch (e) {
+        sassert.revert(e, 'betEndTime should be > betStartTime')
+      }
+    })
 
-    //   try {
-    //     await StandardEvent.new(
-    //       0, eventParams._owner, eventParams._centralizedOracle, eventParams._name,
-    //       ['first'], 2, eventParams._bettingStartTime, eventParams._bettingEndTime,
-    //       eventParams._resultSettingStartTime, eventParams._resultSettingEndTime,
-    //       configMgr.address,
-    //     )
-    //     assert.fail()
-    //   } catch (e) {
-    //     SolAssert.assertRevert(e)
-    //   }
+    it('throws if resultSetStartTime is < betEndTime', async () => {
+      try {
+        const params = await getEventParams(OWNER)
+        params[0] = 'Test Event 6'
+        params[4] = params[3]
+        await createEvent({
+          nbotMethods,
+          eventParams: params,
+          eventFactoryAddr,
+          escrowAmt,
+          from: OWNER, 
+          gas: MAX_GAS,
+        })
+      } catch (e) {
+        sassert.revert(e, 'resultSetStartTime should be >= betEndTime')
+      }
+    })
 
-    //   try {
-    //     await StandardEvent.new(
-    //       0, OWNER, eventParams._centralizedOracle, eventParams._name, ['', 'second'], 2,
-    //       eventParams._bettingStartTime, eventParams._bettingEndTime,
-    //       eventParams._resultSettingStartTime, eventParams._resultSettingEndTime,
-    //       configMgr.address,
-    //     )
-    //     assert.fail()
-    //   } catch (e) {
-    //     SolAssert.assertRevert(e)
-    //   }
-    // })
-
-    // it('throws if bettingEndTime is <= bettingStartTime', async () => {
-    //   try {
-    //     await StandardEvent.new(
-    //       0, OWNER, eventParams._centralizedOracle, eventParams._name,
-    //       eventParams._resultNames, numOfResults, eventParams._bettingStartTime, eventParams._bettingStartTime,
-    //       eventParams._resultSettingStartTime, eventParams._resultSettingEndTime,
-    //       configMgr.address,
-    //     )
-    //     assert.fail()
-    //   } catch (e) {
-    //     SolAssert.assertRevert(e)
-    //   }
-    // })
-
-    // it('throws if resultSettingStartTime is < bettingEndTime', async () => {
-    //   try {
-    //     await StandardEvent.new(
-    //       0, OWNER, eventParams._centralizedOracle, eventParams._name,
-    //       eventParams._resultNames, numOfResults, eventParams._bettingStartTime, eventParams._bettingEndTime,
-    //       eventParams._bettingEndTime - 1, eventParams._resultSettingEndTime, configMgr.address,
-    //     )
-    //     assert.fail()
-    //   } catch (e) {
-    //     SolAssert.assertRevert(e)
-    //   }
-    // })
-
-    // it('throws if resultSettingEndTime is <= resultSettingStartTime', async () => {
-    //   try {
-    //     await StandardEvent.new(
-    //       0, OWNER, eventParams._centralizedOracle, eventParams._name,
-    //       eventParams._resultNames, numOfResults, eventParams._bettingStartTime, eventParams._bettingEndTime,
-    //       eventParams._resultSettingStartTime, eventParams._resultSettingStartTime, configMgr.address,
-    //     )
-    //     assert.fail()
-    //   } catch (e) {
-    //     SolAssert.assertRevert(e)
-    //   }
-    // })
+    it('throws if resultSetEndTime is <= resultSetStartTime', async () => {
+      try {
+        const params = await getEventParams(OWNER)
+        params[0] = 'Test Event 7'
+        params[5] = params[4]
+        await createEvent({
+          nbotMethods,
+          eventParams: params,
+          eventFactoryAddr,
+          escrowAmt,
+          from: OWNER, 
+          gas: MAX_GAS,
+        })
+      } catch (e) {
+        sassert.revert(e, 'resultSetEndTime should be > resultSetStartTime')
+      }
+    })
   })
 
   // describe('fallback function', () => {

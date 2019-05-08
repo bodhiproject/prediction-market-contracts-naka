@@ -136,8 +136,8 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
     {
         bytes memory eventNameBytes = bytes(eventName);
         require(eventNameBytes.length > 0, "Event name cannot be empty");
-        require(!eventResults[0].isEmpty(), "Event result 0 cannot be empty");
-        require(!eventResults[1].isEmpty(), "Event result 1 cannot be empty");
+        require(!eventResults[1].isEmpty(), "First event result cannot be empty");
+        require(!eventResults[2].isEmpty(), "Second event result cannot be empty");
         require(betEndTime > betStartTime, "betEndTime should be > betStartTime");
         require(
             resultSetStartTime >= betEndTime,
