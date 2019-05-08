@@ -99,9 +99,9 @@ contract('MultipleResultsEvent', (accounts) => {
   let configManagerMethods
   let eventFactory
   let eventFactoryAddr
-  let mrEvent
-  let mrEventAddr
-  let mrEventMethods
+  let event
+  let eventAddr
+  let eventMethods
   let eventParams
   let escrowAmt
 
@@ -137,7 +137,7 @@ contract('MultipleResultsEvent', (accounts) => {
 
     // NBOT.transfer() -> create event
     eventParams = await getEventParams(OWNER)
-    mrEventAddr = await createEvent({
+    eventAddr = await createEvent({
       nbotMethods,
       eventParams,
       eventFactoryAddr,
@@ -145,8 +145,8 @@ contract('MultipleResultsEvent', (accounts) => {
       from: OWNER,
       gas: MAX_GAS,
     })
-    mrEvent = await MultipleResultsEvent.at(mrEventAddr)
-    mrEventMethods = mrEvent.contract.methods
+    event = await MultipleResultsEvent.at(eventAddr)
+    eventMethods = event.contract.methods
   })
 
   describe('constructor', () => {
@@ -154,9 +154,9 @@ contract('MultipleResultsEvent', (accounts) => {
     const numOfResults = 4
 
     it('initializes all the values', async () => {
-      assert.equal(await mrEventMethods.owner().call(), OWNER)
+      assert.equal(await eventMethods.owner().call(), OWNER)
       
-      const eventMeta = await mrEventMethods.eventMetadata().call()
+      const eventMeta = await eventMethods.eventMetadata().call()
       assert.equal(eventMeta[0], 0)
       assert.equal(eventMeta[1], 'Test Event 1')
       assert.equal(web3.utils.toUtf8(eventMeta[2][0]), RESULT_INVALID)
@@ -166,14 +166,14 @@ contract('MultipleResultsEvent', (accounts) => {
       assert.equal(web3.utils.toUtf8(eventMeta[2][4]), '')
       assert.equal(eventMeta[3], 4)
 
-      const centralizedMeta = await mrEventMethods.centralizedMetadata().call()
+      const centralizedMeta = await eventMethods.centralizedMetadata().call()
       assert.equal(centralizedMeta[0], eventParams[6])
       assert.equal(centralizedMeta[1], eventParams[2])
       assert.equal(centralizedMeta[2], eventParams[3])
       assert.equal(centralizedMeta[3], eventParams[4])
       assert.equal(centralizedMeta[4], eventParams[5])
 
-      const configMeta = await mrEventMethods.configMetadata().call()
+      const configMeta = await eventMethods.configMetadata().call()
       assert.equal(configMeta[0], escrowAmt)
       assert.equal(
         configMeta[1],
@@ -338,7 +338,7 @@ contract('MultipleResultsEvent', (accounts) => {
     it('throws upon calling', async () => {
       try {
         web3.eth.sendTransaction({
-          to: mrEventAddr,
+          to: eventAddr,
           from: OWNER,
           value: 1,
         })
@@ -423,6 +423,24 @@ contract('MultipleResultsEvent', (accounts) => {
   //     })
   //   })
 
+  describe('bet()', () => {
+    beforeEach(async () => {
+      const currTime = await currentBlockTime()
+      await timeMachine.increaseTime(eventParams[2] - currTime)
+      assert.isAtLeast(currTime, eventParams[2])
+      assert.isBelow(currTime, eventParams[3])
+    })
+
+    it('allows users to bet', async () => {
+      const betAmt = toDenomination(1, BET_TOKEN_DECIMALS)
+      const betResultIndex = 0
+      await eventMethods.bet(betResultIndex, { from: ACCT1, value: betAmt })
+
+      const totalAmts = await eventMethods.totalAmounts().call()
+      assert.equal(totalAmts[0], betAmt)
+    })
+  })
+
   //   describe('vote()', () => {
   //     beforeEach(async () => {
   //       const threshold = await cOracle.consensusThreshold.call()
@@ -499,25 +517,6 @@ contract('MultipleResultsEvent', (accounts) => {
   //     } catch (e) {
   //       SolAssert.assertRevert(e)
   //     }
-  //   })
-  // })
-
-  // describe('bet()', () => {
-  //   beforeEach(async () => {
-  //     await timeMachine.increaseTime(eventParams._bettingStartTime - currentBlockTime())
-  //     assert.isAtLeast(currentBlockTime(), eventParams._bettingStartTime)
-  //     assert.isBelow(currentBlockTime(), eventParams._bettingEndTime)
-  //   })
-
-  //   it('allows users to bet', async () => {
-  //     const betAmount = toDenomination(1, BET_TOKEN_DECIMALS)
-  //     const betResultIndex = 0
-  //     await event.bet(cOracle.address, betResultIndex, { from: ACCT1, value: betAmount })
-
-  //     SolAssert.assertBNEqual((await event.getTotalBets())[betResultIndex], betAmount)
-  //     const betBalances = await event.getBetBalances({ from: ACCT1 })
-  //     SolAssert.assertBNEqual(betBalances[betResultIndex], betAmount)
-  //     SolAssert.assertBNEqual(await event.totalBetTokens.call(), betAmount)
   //   })
   // })
 
