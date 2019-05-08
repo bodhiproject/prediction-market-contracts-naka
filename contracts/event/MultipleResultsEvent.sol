@@ -174,8 +174,10 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
             0);
     }
 
-    /// @notice Fallback function implemented to accept native tokens for betting.
-    function() external payable {}
+    /// @notice Fallback function reverts so no accidental native tokens are sent.
+    function() external payable {
+        revert();
+    }
 
     /// @dev Standard NRC223 function that will handle incoming token transfers.
     /// @param from Token sender address.

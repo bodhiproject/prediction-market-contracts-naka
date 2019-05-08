@@ -1,5 +1,4 @@
 const { assert } = require('chai')
-const bluebird = require('bluebird')
 const { find, each } = require('lodash')
 const TimeMachine = require('sol-time-machine')
 const sassert = require('sol-assert')
@@ -335,20 +334,19 @@ contract('MultipleResultsEvent', (accounts) => {
     })
   })
 
-  // describe('fallback function', () => {
-  //   it('throws upon calling', async () => {
-  //     try {
-  //       await bluebird.promisify(web3.eth.sendTransaction)({
-  //         to: event.address,
-  //         from: OWNER,
-  //         value: 1,
-  //       })
-  //       assert.fail()
-  //     } catch (e) {
-  //       SolAssert.assertRevert(e)
-  //     }
-  //   })
-  // })
+  describe('fallback function', () => {
+    it('throws upon calling', async () => {
+      try {
+        web3.eth.sendTransaction({
+          to: mrEventAddr,
+          from: OWNER,
+          value: 1,
+        })
+      } catch (e) {
+        sassert.revert(e)
+      }
+    })
+  })
 
   // describe('tokenFallback()', () => {
   //   describe('setResult()', () => {
