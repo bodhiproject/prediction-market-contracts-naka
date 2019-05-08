@@ -1,10 +1,16 @@
 const { assert } = require('chai')
-const { find, each } = require('lodash')
 const TimeMachine = require('sol-time-machine')
 const sassert = require('sol-assert')
 
 const getConstants = require('../constants')
-const { toDenomination, bigNumberFloor, percentIncrease, currentBlockTime, paddedHexToAddress, decodeEvent } = require('../util')
+const {
+  toDenomination,
+  bigNumberFloor,
+  percentIncrease,
+  currentBlockTime,
+  paddedHexToAddress,
+  decodeEvent,
+} = require('../util')
 
 const NRC223PreMinted = artifacts.require('NRC223PreMinted')
 const ConfigManager = artifacts.require('ConfigManager')
@@ -88,7 +94,15 @@ const createEvent = async ({
 }
 
 contract('MultipleResultsEvent', (accounts) => {
-  const { OWNER, ACCT1, ACCT2, ACCT3, ACCT4, INVALID_ADDR, MAX_GAS } = getConstants(accounts)
+  const {
+    OWNER,
+    ACCT1,
+    ACCT2,
+    ACCT3,
+    ACCT4,
+    INVALID_ADDR,
+    MAX_GAS,
+  } = getConstants(accounts)
   const timeMachine = new TimeMachine(web3)
 
   let nbot
@@ -150,9 +164,6 @@ contract('MultipleResultsEvent', (accounts) => {
   })
 
   describe('constructor', () => {
-    const resultNames = [RESULT_INVALID, 'A', 'B', 'C']
-    const numOfResults = 4
-
     it('initializes all the values', async () => {
       assert.equal(await eventMethods.owner().call(), OWNER)
       
