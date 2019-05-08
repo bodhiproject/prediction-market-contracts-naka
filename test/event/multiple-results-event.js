@@ -4,10 +4,7 @@ const { find, each } = require('lodash')
 const TimeMachine = require('sol-time-machine')
 const sassert = require('sol-assert')
 
-// const ContractHelper = require('../util/contract_helper')
-// const Abi = require('../util/abi')
 const getConstants = require('../constants')
-// const { EventHash, EventStatus } = require('../util/constants')
 const { toDenomination, bigNumberFloor, percentIncrease, currentBlockTime, paddedHexToAddress, decodeEvent } = require('../util')
 
 const NRC223PreMinted = artifacts.require('NRC223PreMinted')
@@ -19,6 +16,7 @@ const web3 = global.web3
 
 const CREATE_EVENT_FUNC_SIG = '2b2601bf'
 const RESULT_INVALID = 'Invalid'
+const BET_TOKEN_DECIMALS = 18
 const createEventFuncTypes = [
   'string',
   'bytes32[10]',
@@ -92,7 +90,6 @@ const createEvent = async ({
 
 contract('MultipleResultsEvent', (accounts) => {
   const { OWNER, ACCT1, ACCT2, ACCT3, ACCT4, INVALID_ADDR, MAX_GAS } = getConstants(accounts)
-  const BET_TOKEN_DECIMALS = 18
   const timeMachine = new TimeMachine(web3)
 
   let nbot
