@@ -345,20 +345,6 @@ contract('MultipleResultsEvent', (accounts) => {
     })
   })
 
-  describe('fallback function', () => {
-    it('throws upon calling', async () => {
-      try {
-        web3.eth.sendTransaction({
-          to: eventAddr,
-          from: OWNER,
-          value: 1,
-        })
-      } catch (e) {
-        sassert.revert(e)
-      }
-    })
-  })
-
   // describe('tokenFallback()', () => {
   //   describe('setResult()', () => {
   //     let threshold
