@@ -251,7 +251,7 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         // Subtract arbitration reward from bet round losers' total
         uint arbitrationReward = 
             uint(_arbitrationRewardPercentage).mul(betRoundLosersTotal).div(100);
-        betRoundLosersTotal = betRdLoserTotal.sub(arbitrationReward);
+        betRoundLosersTotal = betRoundLosersTotal.sub(arbitrationReward);
 
         // Calculate all vote rounds totals
         uint voteRoundsWinnersTotal;
@@ -260,7 +260,7 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
             for (uint8 j = 0; j < _numOfResults; j++) {
                 uint total = _eventRounds[i].balances[j].total;
                 if (j == _currentResultIndex) {
-                    voteRoundsWinnersTotal = voteRoundsWinnersTotal.add(total)
+                    voteRoundsWinnersTotal = voteRoundsWinnersTotal.add(total);
                 } else {
                     voteRoundsLosersTotal = voteRoundsLosersTotal.add(total);
                 }
@@ -340,7 +340,7 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
     }
 
     function totalBets() public view returns (uint) {
-        return _totalBets
+        return _totalBets;
     }
 
     function didWithdraw() public view returns (bool) {
