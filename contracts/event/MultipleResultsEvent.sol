@@ -13,18 +13,10 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
     using ByteUtils for bytes32;
     using SafeMath for uint;
 
-    /// @dev Represents the accumulated bets/votes.
-    struct DepositTotal {
-        uint totalBets;
-        uint totalVotes;
-    }
-
-    /// @dev Represents all the bets/votes of a result.
-    struct RoundDeposits {
-        uint roundBets;
-        uint roundVotes;
+    /// @dev Represents all the bets of a result.
+    struct ResultBalance {
+        uint total;
         mapping(address => uint) bets;
-        mapping(address => uint) votes;
     }
 
     /// @dev Represents the aggregated bets/votes of a round.
@@ -34,7 +26,7 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         uint8 resultIndex;
         uint consensusThreshold;
         uint arbitrationEndTime;
-        RoundDeposits[11] deposits;
+        ResultBalance[11] balances;
     }
 
     uint16 private constant VERSION = 0;
@@ -56,8 +48,8 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
     uint private _arbitrationLength;
     uint private _thresholdPercentIncrease;
     uint private _arbitrationRewardPercentage;
-    DepositTotal private _allTotals;
-    DepositTotal[11] private _resultTotals;
+    uint private _totalBets;
+    uint[11] private _resultTotals;
     mapping(uint8 => EventRound) private _eventRounds;
     mapping(address => bool) private _didWithdraw;
 
@@ -252,56 +244,58 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
     function calculateWinnings()
         public
         view
-        returns (uint, uint)
+        returns (uint)
     {
-        // Get winning bets/votes for sender
-        uint bets;
-        uint votes;
-        for (uint8 i = 0; i <= _currentRound; i++) {
-            bets = bets.add(
-                _eventRounds[i].deposits[_currentResultIndex].bets[msg.sender]);
-            votes = votes.add(
-                _eventRounds[i].deposits[_currentResultIndex].votes[msg.sender]);
-        }
-
-        // Calculate losers' bets
-        uint losersTotal;
+        // Calculate bet round losers' total
+        uint betRoundLosersTotal;
         for (uint8 i = 0; i < _numOfResults; i++) {
             if (i != _currentResultIndex) {
-                losersTotal = losersTotal.add(_resultTotals[i].totalBets);
+                betRoundLosersTotal = 
+                    betRoundLosersTotal.add(_eventRounds[0].balances[i].total);
             }
         }
-        // Subtract arbitration participation reward from losers total
-        uint betTokenReward = 
-            uint(_arbitrationRewardPercentage).mul(losersTotal).div(100);
-        losersTotal = losersTotal.sub(betTokenReward);
 
-        // Calculate bet token return
-        uint winnersTotal;
-        uint betTokenReturn;
-        if (bets > 0) {
-            winnersTotal = _resultTotals[_currentResultIndex].totalBets;
-            betTokenReturn = bets.mul(losersTotal).div(winnersTotal).add(bets);
-        }
+        // Subtract arbitration reward from bet round losers' total
+        uint arbitrationReward = 
+            uint(_arbitrationRewardPercentage).mul(betRoundLosersTotal).div(100);
+        betRoundLosersTotal = betRdLoserTotal.sub(arbitrationReward);
 
-        // Calculate vote token return
-        uint voteTokenReturn;
-        if (votes > 0) {
-            winnersTotal = _resultTotals[_currentResultIndex].totalVotes;
-            losersTotal = 0;
-            for (uint8 i = 0; i < _numOfResults; i++) {
-                if (i != _currentResultIndex) {
-                    losersTotal = losersTotal.add(_resultTotals[i].totalVotes);
+        // Calculate all vote rounds totals
+        uint voteRoundsWinnersTotal;
+        uint voteRoundsLosersTotal;
+        for (uint8 i = 1; i <= _currentRound; i++) {
+            for (uint8 j = 0; j < _numOfResults; j++) {
+                uint total = _eventRounds[i].balances[j].total;
+                if (j == _currentResultIndex) {
+                    voteRoundsWinnersTotal = voteRoundsWinnersTotal.add(total)
+                } else {
+                    voteRoundsLosersTotal = voteRoundsLosersTotal.add(total);
                 }
             }
-            voteTokenReturn = votes.mul(losersTotal).div(winnersTotal).add(votes);
-
-            // Add bet token reward from arbitration to betTokenReturn
-            uint rewardWon = votes.mul(betTokenReward).div(winnersTotal);
-            betTokenReturn = betTokenReturn.add(rewardWon);
         }
 
-        return (betTokenReturn, voteTokenReturn);
+        // Calculate all rounds totals
+        uint allRoundsWinnersTotal = _resultTotals[_currentResultIndex];
+        uint allRoundsLosersTotal = betRoundLosersTotal.add(voteRoundsLosersTotal);
+
+        // Calculate user's winning bets
+        uint allRoundsUserBets;
+        uint voteRoundsUserBets;
+        for (uint8 i = 0; i <= _currentRound; i++) {
+            uint bets = _eventRounds[i].balances[_currentResultIndex].bets[msg.sender];
+            allRoundsUserBets = allRoundsUserBets.add(bets);
+            if (i > 0) {
+                voteRoundsUserBets = voteRoundsUserBets.add(bets);
+            }
+        }
+
+        // Calculate users portion of all rounds losers total
+        uint winningAmt = 
+            allRoundsUserBets.mul(allRoundsLosersTotal).div(allRoundsWinnersTotal);
+        uint arbitrationRewardAmt =
+            voteRoundsUserBets.mul(arbitrationReward).div(voteRoundsWinnersTotal);
+        winningAmt = winningAmt.add(arbitrationRewardAmt);
+        return winningAmt;
     }
 
     function version() public pure returns (uint16) {
@@ -352,8 +346,8 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         );
     }
 
-    function totalAmounts() public view returns (uint, uint) {
-        return (_allTotals.totalBets, _allTotals.totalVotes);
+    function totalBets() public view returns (uint) {
+        return _totalBets
     }
 
     function didWithdraw() public view returns (bool) {
@@ -388,6 +382,7 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         private
         validResultIndex(resultIndex)
     {
+        require(_currentRound == 0, "Can only bet during the betting round");
         require(
             block.timestamp >= _betStartTime,
             "Current time should be >= betStartTime");
@@ -397,13 +392,12 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         require(value > 0, "Bet amount should be > 0");
 
         // Update balances
-        _eventRounds[0].deposits[resultIndex].roundBets =
-            _eventRounds[0].deposits[resultIndex].roundBets.add(value);
-        _eventRounds[0].deposits[resultIndex].bets[from] =
-            _eventRounds[0].deposits[resultIndex].bets[from].add(value);
-        _resultTotals[resultIndex].totalBets =
-            _resultTotals[resultIndex].totalBets.add(value);
-        _allTotals.totalBets = _allTotals.totalBets.add(value);
+        _eventRounds[0].balances[resultIndex].total =
+            _eventRounds[0].balances[resultIndex].total.add(value);
+        _eventRounds[0].balances[resultIndex].bets[from] =
+            _eventRounds[0].balances[resultIndex].bets[from].add(value);
+        _resultTotals[resultIndex] = _resultTotals[resultIndex].add(value);
+        _totalBets = _totalBets.add(value);
 
         // Emit events
         emit BetPlaced(address(this), from, resultIndex, value, _currentRound);
@@ -420,6 +414,7 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         private
         validResultIndex(resultIndex)
     {
+        require(_currentRound == 0, "Can only set result during the betting round");
         require(!_eventRounds[0].finished, "Result has already been set");
         require(
             block.timestamp >= _resultSetStartTime,
@@ -440,13 +435,12 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         _currentRound = _currentRound + 1;
 
         // Update balances
-        _eventRounds[0].deposits[resultIndex].roundVotes =
-            _eventRounds[0].deposits[resultIndex].roundVotes.add(value);
-        _eventRounds[0].deposits[resultIndex].votes[from] =
-            _eventRounds[0].deposits[resultIndex].votes[from].add(value);
-        _resultTotals[resultIndex].totalVotes =
-            _resultTotals[resultIndex].totalVotes.add(value);
-        _allTotals.totalVotes = _allTotals.totalVotes.add(value);
+        _eventRounds[0].balances[resultIndex].total =
+            _eventRounds[0].balances[resultIndex].total.add(value);
+        _eventRounds[0].balances[resultIndex].bets[from] =
+            _eventRounds[0].balances[resultIndex].bets[from].add(value);
+        _resultTotals[resultIndex] = _resultTotals[resultIndex].add(value);
+        _totalBets = _totalBets.add(value);
 
         // Init DecentralizedOracle round
         uint nextThreshold = getNextThreshold(_eventRounds[0].consensusThreshold);
@@ -473,6 +467,7 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         private
         validResultIndex(resultIndex)
     {
+        require(_currentRound > 0, "Can only vote after the betting round");
         require(
             block.timestamp < _eventRounds[_currentRound].arbitrationEndTime,
             "Current time should be < arbitrationEndTime");
@@ -482,19 +477,18 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         require(value > 0, "Vote amount should be > 0");
 
         // Update balances
-        _eventRounds[_currentRound].deposits[resultIndex].roundVotes =
-            _eventRounds[_currentRound].deposits[resultIndex].roundVotes.add(value);
-        _eventRounds[_currentRound].deposits[resultIndex].votes[from] =
-            _eventRounds[_currentRound].deposits[resultIndex].votes[from].add(value);
-        _resultTotals[resultIndex].totalVotes =
-            _resultTotals[resultIndex].totalVotes.add(value);
-        _allTotals.totalVotes = _allTotals.totalVotes.add(value);
+        _eventRounds[_currentRound].balances[resultIndex].total =
+            _eventRounds[_currentRound].balances[resultIndex].total.add(value);
+        _eventRounds[_currentRound].balances[resultIndex].bets[from] =
+            _eventRounds[_currentRound].balances[resultIndex].bets[from].add(value);
+        _resultTotals[resultIndex] = _resultTotals[resultIndex].add(value);
+        _totalBets = _totalBets.add(value);
 
         // Emit events
         emit VotePlaced(address(this), from, resultIndex, value, _currentRound);
 
         // If voted over the threshold, create a new DecentralizedOracle round
-        uint resultVotes = _eventRounds[_currentRound].deposits[resultIndex].roundVotes;
+        uint resultVotes = _eventRounds[_currentRound].balances[resultIndex].total;
         uint threshold = _eventRounds[_currentRound].consensusThreshold;
         if (resultVotes >= threshold) {
             voteSetResult(from, resultIndex, value);
