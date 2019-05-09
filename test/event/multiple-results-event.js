@@ -69,7 +69,7 @@ const createEvent = async ({
     const paramsHex = web3.eth.abi.encodeParameters(
       createEventFuncTypes,
       eventParams,
-    ).substr(2)
+    ).substr(2) // Remove hex prefix
     const data = `0x${CREATE_EVENT_FUNC_SIG}${paramsHex}`
 
     // Send tx
@@ -437,15 +437,18 @@ contract('MultipleResultsEvent', (accounts) => {
   describe('bet()', () => {
     beforeEach(async () => {
       const currTime = await currentBlockTime()
-      await timeMachine.increaseTime(eventParams[2] - currTime)
-      assert.isAtLeast(currTime, eventParams[2])
-      assert.isBelow(currTime, eventParams[3])
+			console.log('NAKA: currTime', currTime)
+			console.log('NAKA: eventParams[2]', eventParams[2])
+			console.log('NAKA: diff', Number(eventParams[2]) - currTime)
+      await timeMachine.increaseTime(Number(eventParams[2]) - currTime)
+      assert.isAtLeast(await currentBlockTime(), Number(eventParams[2]))
+      assert.isBelow(await currentBlockTime(), Number(eventParams[3]))
     })
 
     it('allows users to bet', async () => {
       const betAmt = toDenomination(1, BET_TOKEN_DECIMALS)
       const betResultIndex = 0
-      await eventMethods.bet(betResultIndex, { from: ACCT1, value: betAmt })
+      await eventMethods.bet(betResultIndex).send({ from: ACCT1, value: betAmt })
 
       const totalAmts = await eventMethods.totalAmounts().call()
       assert.equal(totalAmts[0], betAmt)
