@@ -305,6 +305,14 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         return _currentResultIndex;
     }
 
+    function currentConsensusThreshold() public view returns (uint) {
+        return _eventRounds[_currentRound].consensusThreshold;
+    }
+
+    function currentArbitrationEndTime() public view returns (uint) {
+        return _eventRounds[_currentRound].arbitrationEndTime;
+    }
+
     function eventMetadata()
         public
         view
