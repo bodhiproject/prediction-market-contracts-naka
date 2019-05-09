@@ -87,6 +87,7 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         uint nextArbitrationEndTime
     );
     event WinningsWithdrawn(
+        address indexed eventAddress,
         address indexed winner,
         uint winningAmount,
         uint escrowAmount
@@ -229,7 +230,8 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         }
 
         // Emit events
-        emit WinningsWithdrawn(msg.sender, winningAmount, escrowAmount);
+        emit WinningsWithdrawn(address(this), msg.sender, winningAmount, 
+            escrowAmount);
     }
 
     /// @notice Calculates the tokens returned based on the sender's participation.
