@@ -174,11 +174,6 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
             0);
     }
 
-    /// @notice Fallback function reverts so no accidental native tokens are sent.
-    function() external payable {
-        revert();
-    }
-
     /// @dev Standard NRC223 function that will handle incoming token transfers.
     /// @param from Token sender address.
     /// @param value Amount of tokens.
@@ -192,15 +187,19 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         require(msg.sender == _bodhiTokenAddress, "Only NBOT is accepted");
         require(data.length >= 4, "Data is not long enough.");
 
+        bytes memory betFunc = hex"885ab66d";
         bytes memory setResultFunc = hex"a6b4218b";
         bytes memory voteFunc = hex"1e00eb7f";
 
         bytes memory funcHash = data.sliceBytes(0, 4);
-        bytes memory params = data.sliceBytes(4, data.length);
+        bytes memory params = data.sliceBytes(4, data.length - 4);
         (uint8 resultIndex) = abi.decode(params, (uint8));
 
         bytes32 funcCalled = keccak256(abi.encodePacked(funcHash));
-        if (funcCalled == keccak256(abi.encodePacked(setResultFunc))) {
+        if (funcCalled == keccak256(abi.encodePacked(betFunc))) {
+            assert(data.length == 36);
+            bet(from, resultIndex, value);
+        } else if (funcCalled == keccak256(abi.encodePacked(setResultFunc))) {
             assert(data.length == 36);
             setResult(from, resultIndex, value);
         } else if (funcCalled == keccak256(abi.encodePacked(voteFunc))) {
@@ -209,36 +208,6 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         } else {
             revert("Unhandled function in tokenFallback");
         }
-    }
-
-    /// @notice Places a bet.
-    /// @param resultIndex Index of result to bet on.
-    function bet(
-        uint8 resultIndex)
-        external
-        payable
-        validResultIndex(resultIndex)
-    {
-        require(
-            block.timestamp >= _betStartTime,
-            "Current time should be >= betStartTime");
-        require(
-            block.timestamp < _betEndTime,
-            "Current time should be < betEndTime.");
-        require(msg.value > 0, "Bet amount should be > 0");
-
-        // Update balances
-        _eventRounds[0].deposits[resultIndex].roundBets =
-            _eventRounds[0].deposits[resultIndex].roundBets.add(msg.value);
-        _eventRounds[0].deposits[resultIndex].bets[msg.sender] =
-            _eventRounds[0].deposits[resultIndex].bets[msg.sender].add(msg.value);
-        _resultTotals[resultIndex].totalBets =
-            _resultTotals[resultIndex].totalBets.add(msg.value);
-        _allTotals.totalBets = _allTotals.totalBets.add(msg.value);
-
-        // Emit events
-        emit BetPlaced(address(this), msg.sender, resultIndex, msg.value, 
-            _currentRound);
     }
 
     /// @notice Withdraw winnings if the DecentralizedOracle round arbitrationEndTime has passed.
@@ -406,6 +375,38 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         _eventRounds[roundIndex].resultIndex = INVALID_RESULT_INDEX;
         _eventRounds[roundIndex].consensusThreshold = consensusThreshold;
         _eventRounds[roundIndex].arbitrationEndTime = arbitrationEndTime;
+    }
+
+    /// @notice Places a bet. Only tokenFallback should call this.
+    /// @param from Address who is betting.
+    /// @param resultIndex Index of the result to bet on.
+    /// @param value Amount of tokens used to bet.
+    function bet(
+        address from,
+        uint8 resultIndex,
+        uint value)
+        private
+        validResultIndex(resultIndex)
+    {
+        require(
+            block.timestamp >= _betStartTime,
+            "Current time should be >= betStartTime");
+        require(
+            block.timestamp < _betEndTime,
+            "Current time should be < betEndTime.");
+        require(value > 0, "Bet amount should be > 0");
+
+        // Update balances
+        _eventRounds[0].deposits[resultIndex].roundBets =
+            _eventRounds[0].deposits[resultIndex].roundBets.add(value);
+        _eventRounds[0].deposits[resultIndex].bets[from] =
+            _eventRounds[0].deposits[resultIndex].bets[from].add(value);
+        _resultTotals[resultIndex].totalBets =
+            _resultTotals[resultIndex].totalBets.add(value);
+        _allTotals.totalBets = _allTotals.totalBets.add(value);
+
+        // Emit events
+        emit BetPlaced(address(this), from, resultIndex, value, _currentRound);
     }
 
     /// @dev Centralized Oracle sets the result. Only tokenFallback should be calling this.
