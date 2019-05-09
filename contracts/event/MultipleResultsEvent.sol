@@ -88,8 +88,7 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
     );
     event WinningsWithdrawn(
         address indexed winner,
-        uint betTokensAmount,
-        uint voteTokensAmount,
+        uint winningAmount,
         uint escrowAmount
     );
 
@@ -217,14 +216,9 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
 
         // Calculate and transfer winnings
         _didWithdraw[msg.sender] = true;
-        uint betTokenAmount;
-        uint voteTokenAmount;
-        (betTokenAmount, voteTokenAmount) = calculateWinnings();
-        if (betTokenAmount > 0) {
-            msg.sender.transfer(betTokenAmount);
-        }
-        if (voteTokenAmount > 0) {
-            INRC223(_bodhiTokenAddress).transfer(msg.sender, voteTokenAmount);
+        uint winningAmount = calculateWinnings();
+        if (winningAmount > 0) {
+            INRC223(_bodhiTokenAddress).transfer(msg.sender, winningAmount);
         }
 
         // Transfer escrow if owner
@@ -235,8 +229,7 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         }
 
         // Emit events
-        emit WinningsWithdrawn(msg.sender, betTokenAmount, voteTokenAmount, 
-            escrowAmount);
+        emit WinningsWithdrawn(msg.sender, winningAmount, escrowAmount);
     }
 
     /// @notice Calculates the tokens returned based on the sender's participation.
