@@ -189,13 +189,10 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
 
         bytes32 funcCalled = keccak256(abi.encodePacked(funcHash));
         if (funcCalled == keccak256(abi.encodePacked(betFunc))) {
-            assert(data.length == 36);
             bet(from, resultIndex, value);
         } else if (funcCalled == keccak256(abi.encodePacked(setResultFunc))) {
-            assert(data.length == 36);
             setResult(from, resultIndex, value);
         } else if (funcCalled == keccak256(abi.encodePacked(voteFunc))) {
-            assert(data.length == 36);
             vote(from, resultIndex, value);
         } else {
             revert("Unhandled function in tokenFallback");
