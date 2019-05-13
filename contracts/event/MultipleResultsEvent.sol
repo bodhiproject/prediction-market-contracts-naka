@@ -350,8 +350,8 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         return _totalBets;
     }
 
-    function didWithdraw() public view returns (bool) {
-        return _didWithdraw[msg.sender];
+    function didWithdraw(address withdrawer) public view returns (bool) {
+        return _didWithdraw[withdrawer];
     }
 
     function didWithdrawEscrow() public view returns (bool) {
