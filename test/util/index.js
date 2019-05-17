@@ -1,4 +1,6 @@
-const web3 = global.web3;
+const { find, each, isPlainObject, isArray } = require('lodash')
+
+const web3 = global.web3
 
 module.exports = class Utils {
   /*
@@ -9,9 +11,9 @@ module.exports = class Utils {
   * @retun {BigNumber} The converted BigNumber.
   */
   static toDenomination(number, decimals = 0) {
-    const bn = web3.toBigNumber(number);
-    const decimalsBn = web3.toBigNumber(10 ** decimals);
-    return bn.times(decimalsBn);
+    const bn = web3.toBigNumber(number)
+    const decimalsBn = web3.toBigNumber(10 ** decimals)
+    return bn.times(decimalsBn)
   }
 
   /*
@@ -20,7 +22,7 @@ module.exports = class Utils {
   * @retun {BigNumber} The truncated BigNumber.
   */
   static bigNumberFloor(bigNumber) {
-    return web3.toBigNumber(bigNumber.toString().split('.')[0]);
+    return web3.toBigNumber(bigNumber.toString().split('.')[0])
   }
 
   /*
@@ -30,12 +32,12 @@ module.exports = class Utils {
   * @retun {BigNumber} The increased BigNumber by the percentage.
   */
   static percentIncrease(bigNumber, percentage) {
-    return bigNumber.times(web3.toBigNumber(percentage)).div(web3.toBigNumber(100)).plus(bigNumber);
+    return bigNumber.times(web3.toBigNumber(percentage)).div(web3.toBigNumber(100)).plus(bigNumber)
   }
 
   // Gets the unix time in seconds of the current block
-  static currentBlockTime() {
-    return web3.eth.getBlock(web3.eth.blockNumber).timestamp;
+  static async currentBlockTime() {
+    return (await web3.eth.getBlock(web3.eth.blockNumber)).timestamp
   }
 
   /*
@@ -45,8 +47,67 @@ module.exports = class Utils {
   * @return {string} The hex string with the padded zeros removed.
   */
   static paddedHexToAddress(hexString) {
-    const regex = new RegExp(/(0x)(0+)([a-fA-F0-9]{40})/);
-    const matches = regex.exec(hexString);
-    return matches && matches[1] + matches[3];
+    const regex = new RegExp(/(0x)(0+)([a-fA-F0-9]{40})/)
+    const matches = regex.exec(hexString)
+    return matches && matches[1] + matches[3]
   }
-};
+
+  /**
+   * Gets the object from the ABI given the name and type
+   * @param {object} abi ABI to search in
+   * @param {string} name Name of the function or event
+   * @param {string} type One of: [function, event]
+   * @return {object|undefined} Object found in ABI
+   */
+  static getAbiObject(abi, name, type) {
+    if (!abi) return undefined;
+    return find(abi, { name, type });
+  }
+
+  /**
+   * Gets an event signature from the ABI given the name
+   * @param {object} abi ABI to search in
+   * @param {string} name Name of the function or event
+   * @return {object|undefined} Object found in ABI
+   */
+  static getEventSig(abi, name) {
+    const obj = Utils.getAbiObject(abi, name, 'event')
+    return web3.eth.abi.encodeEventSignature(obj)
+  }
+
+  static decodeEvent(events, abi, name) {
+    const obj = Utils.getAbiObject(abi, name, 'event')
+    const eventSig = Utils.getEventSig(abi, name)
+    const keys = Object.keys(events)
+
+    // Checks object's topics for the matching event signature
+    const decode = (event) => {
+      if (isPlainObject(event) && event.raw.topics.includes(eventSig)) {
+        return web3.eth.abi.decodeLog(
+          obj.inputs,
+          event.raw.data,
+          event.raw.topics,
+        )
+      }
+      return undefined
+    }
+
+    let decoded
+    each(keys, (key) => {
+      const event = events[key]
+
+      // Try to decode if event is an object
+      decoded = decode(event)
+      if (decoded) return false
+
+      // Otherwise loop through each sub-event
+      if (isArray(event)) {
+        each(event, (innerEvent) => {
+          decoded = decode(innerEvent)
+          if (decoded) return false
+        })
+      }
+    })
+    return decoded
+  }
+}
