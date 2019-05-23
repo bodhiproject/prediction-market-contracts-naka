@@ -240,7 +240,8 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         view
         returns (uint)
     {
-        // Return 0 if there currentResultIndex is invalid
+        // Return 0 if there currentResultIndex is invalid since we cannot
+        // iterate through the balances by that index.
         if (_currentResultIndex == INVALID_RESULT_INDEX) {
             return 0;
         }
