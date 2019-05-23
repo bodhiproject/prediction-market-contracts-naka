@@ -82,7 +82,7 @@ contract EventFactory is NRC223Receiver {
         _escrows[msg.sender].didWithdraw = true;
         uint amount = _escrows[msg.sender].amount;
 
-        // Transfer to depositer of escrow
+        // Transfer to escrow depositer
         INRC223(_bodhiTokenAddress).transfer(_escrows[msg.sender].depositer, amount);
 
         return amount;
