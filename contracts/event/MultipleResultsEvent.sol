@@ -214,7 +214,7 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
 
         // Calculate and transfer winnings
         _didWithdraw[msg.sender] = true;
-        uint winningAmount = calculateWinnings();
+        uint winningAmount = calculateWinnings(msg.sender);
         if (winningAmount > 0) {
             INRC223(_bodhiTokenAddress).transfer(msg.sender, winningAmount);
         }
@@ -232,12 +232,19 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
     }
 
     /// @notice Calculates the tokens returned based on the sender's participation.
+    /// @param better Address to calculate winnings for.
     /// @return Amount of bet and vote tokens won.
-    function calculateWinnings()
+    function calculateWinnings(
+        address better)
         public
         view
         returns (uint)
     {
+        // Return 0 if there currentResultIndex is invalid
+        if (_currentResultIndex == INVALID_RESULT_INDEX) {
+            return 0;
+        }
+
         // Calculate bet round losers' total
         uint betRoundLosersTotal;
         for (uint8 i = 0; i < _numOfResults; i++) {
@@ -274,7 +281,7 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         uint allRoundsUserBets;
         uint voteRoundsUserBets;
         for (uint8 i = 0; i <= _currentRound; i++) {
-            uint bets = _eventRounds[i].balances[_currentResultIndex].bets[msg.sender];
+            uint bets = _eventRounds[i].balances[_currentResultIndex].bets[better];
             allRoundsUserBets = allRoundsUserBets.add(bets);
             if (i > 0) {
                 voteRoundsUserBets = voteRoundsUserBets.add(bets);
