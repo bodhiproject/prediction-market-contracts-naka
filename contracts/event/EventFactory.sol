@@ -16,7 +16,7 @@ contract EventFactory is NRC223Receiver {
         uint amount;
     }
 
-    uint16 private constant VERSION = 0;
+    uint16 private constant VERSION = 1;
 
     address private _configManager;
     address private _bodhiTokenAddress;

@@ -1,7 +1,8 @@
 {
-  "name": "bodhi-ethereum",
-  "version": "1.0.0",
-  "description": "Bodhi Ethereum Contracts",
+  "name": "prediction-market-contracts-naka",
+  "version": "0.0.1",
+  "description": "Bodhi Prediction Market Contracts for Nakachain",
+  "private": true,
   "main": "truffle-config.js",
   "directories": {
     "test": "test"
@@ -19,20 +20,19 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/bodhiproject/bodhi-ethereum.git"
+    "url": "git+https://github.com/bodhiproject/prediction-market-contracts-naka.git"
   },
   "keywords": [
     "bodhi",
-    "ethereum",
-    "erc223",
     "prediction",
     "market",
-    "dapp"
+    "ethereum",
+    "smart contracts"
   ],
   "author": "Deric Walintukan",
   "license": "ISC",
   "bugs": {
-    "url": "https://github.com/bodhiproject/bodhi-ethereum/issues"
+    "url": "https://github.com/bodhiproject/prediction-market-contracts-naka/issues"
   },
-  "homepage": "https://github.com/bodhiproject/bodhi-ethereum#readme"
+  "homepage": "https://github.com/bodhiproject/prediction-market-contracts-naka#readme"
 }

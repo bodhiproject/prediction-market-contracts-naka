@@ -29,7 +29,7 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         ResultBalance[11] balances;
     }
 
-    uint16 private constant VERSION = 0;
+    uint16 private constant VERSION = 1;
     uint8 private constant INVALID_RESULT_INDEX = 255;
 
     uint8 private _numOfResults;
