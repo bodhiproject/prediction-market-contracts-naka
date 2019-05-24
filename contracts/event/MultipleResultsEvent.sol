@@ -290,10 +290,10 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         }
 
         // Calculate users portion of all rounds losers total
-        uint winningAmt = 
-            allRoundsUserBets.mul(allRoundsLosersTotal).div(allRoundsWinnersTotal);
-        uint arbitrationRewardAmt =
-            voteRoundsUserBets.mul(arbitrationReward).div(voteRoundsWinnersTotal);
+        uint winningAmt = allRoundsUserBets.mul(allRoundsLosersTotal)
+            .div(allRoundsWinnersTotal).add(allRoundsUserBets);
+        uint arbitrationRewardAmt = voteRoundsUserBets.mul(arbitrationReward)
+            .div(voteRoundsWinnersTotal);
         winningAmt = winningAmt.add(arbitrationRewardAmt);
         return winningAmt;
     }
