@@ -16,7 +16,7 @@ contract EventFactory is NRC223Receiver {
         uint amount;
     }
 
-    uint16 private constant VERSION = 0;
+    uint16 private constant VERSION = 1;
 
     address private _configManager;
     address private _bodhiTokenAddress;
@@ -81,7 +81,9 @@ contract EventFactory is NRC223Receiver {
 
         _escrows[msg.sender].didWithdraw = true;
         uint amount = _escrows[msg.sender].amount;
-        INRC223(_bodhiTokenAddress).transfer(msg.sender, amount);
+
+        // Transfer to escrow depositer
+        INRC223(_bodhiTokenAddress).transfer(_escrows[msg.sender].depositer, amount);
 
         return amount;
     }
