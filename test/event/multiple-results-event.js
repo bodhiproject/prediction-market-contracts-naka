@@ -19,17 +19,9 @@ const MultipleResultsEvent = artifacts.require('MultipleResultsEvent')
 const web3 = global.web3
 
 const CREATE_EVENT_FUNC_SIG = '2b2601bf'
+const BET_FUNC_SIG = '885ab66d'
 const RESULT_INVALID = 'Invalid'
-const BET_TOKEN_DECIMALS = 18
-const createEventFuncTypes = [
-  'string',
-  'bytes32[10]',
-  'uint256',
-  'uint256',
-  'uint256',
-  'uint256',
-  'address',
-]
+const BET_TOKEN_DECIMALS = 8
 
 const getEventParams = async (cOracle) => {
   const currTime = await currentBlockTime()
@@ -67,7 +59,7 @@ const createEvent = async ({
     // Construct data
     const data = constructTransfer223Data(
       CREATE_EVENT_FUNC_SIG,
-      createEventFuncTypes,
+      ['string', 'bytes32[10]', 'uint256', 'uint256', 'uint256', 'uint256', 'address'],
       eventParams,
     )
 
@@ -162,7 +154,7 @@ contract('MultipleResultsEvent', (accounts) => {
     eventMethods = event.contract.methods
   })
 
-  describe.only('constructor', () => {
+  describe('constructor', () => {
     it('initializes all the values', async () => {
       assert.equal(await eventMethods.owner().call(), OWNER)
       
@@ -419,7 +411,7 @@ contract('MultipleResultsEvent', (accounts) => {
   //     })
   //   })
 
-  describe('bet()', () => {
+  describe.only('bet()', () => {
     beforeEach(async () => {
       const currTime = await currentBlockTime()
       await timeMachine.increaseTime(Number(eventParams[2]) - currTime)
@@ -428,12 +420,15 @@ contract('MultipleResultsEvent', (accounts) => {
     })
 
     it('allows users to bet', async () => {
-      const betAmt = toDenomination(1, BET_TOKEN_DECIMALS)
-      const betResultIndex = 0
-      await eventMethods.bet(betResultIndex).send({ from: ACCT1, value: betAmt })
-
-      const totalAmts = await eventMethods.totalAmounts().call()
-      assert.equal(totalAmts[0], betAmt)
+      const amt = toDenomination(1, BET_TOKEN_DECIMALS)
+      const resultIndex = 0
+      const data = constructTransfer223Data(BET_FUNC_SIG, ['uint8'], [resultIndex])
+      await nbotMethods['transfer(address,uint256,bytes)'](
+        eventAddr,
+        amt,
+        web3.utils.hexToBytes(data),
+      ).send({ from: OWNER, gas: 200000 })
+      assert.equal(await eventMethods.totalBets().call(), amt)
     })
   })
 

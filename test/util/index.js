@@ -15,17 +15,16 @@ module.exports = class Utils {
     return str
   }
 
-  /*
-  * Converts the amount to a lower denomination as a BigNumber.
-  * eg. (number: 1, decimals: 4) = 10000
-  * @param number {BigNumber|number|string} The number to convert.
-  * @param decimals {number} The denomination number of decimals to convert to.
-  * @retun {BigNumber} The converted BigNumber.
-  */
-  static toDenomination(number, decimals = 0) {
-    const bn = web3.utils.toBN(number)
+  /**
+   * Converts the amount to a lower denomination.
+   * @param {number|string} amount Amount to convert
+   * @param {number} decimals Number of decimals
+   * @return {string} Amount as string number
+   */
+  static toDenomination(amount, decimals = 0) {
+    const bn = web3.utils.toBN(amount)
     const decimalsBn = web3.utils.toBN(10 ** decimals)
-    return bn.mul(decimalsBn)
+    return bn.mul(decimalsBn).toString(10)
   }
 
   /*
