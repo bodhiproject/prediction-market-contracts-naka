@@ -1,8 +1,20 @@
-const { find, each, isPlainObject, isArray } = require('lodash')
+const { find, each, isPlainObject, isArray, isString } = require('lodash')
 
 const web3 = global.web3
 
 module.exports = class Utils {
+  static addHexPrefix(str) {
+    if (!isString(str)) return str
+    if (!str.startsWith('0x')) return `0x${str}`
+    return str
+  }
+
+  static removeHexPrefix(str) {
+    if (!isString(str)) return str
+    if (str.startsWith('0x')) return str.substr(2)
+    return str
+  }
+
   /*
   * Converts the amount to a lower denomination as a BigNumber.
   * eg. (number: 1, decimals: 4) = 10000
@@ -52,6 +64,11 @@ module.exports = class Utils {
     const regex = new RegExp(/(0x)(0+)([a-fA-F0-9]{40})/)
     const matches = regex.exec(hexString)
     return matches && matches[1] + matches[3]
+  }
+
+  static constructTransfer223Data(funcSig, types, params) {
+    const encoded = Utils.removeHexPrefix(web3.eth.abi.encodeParameters(types, params))
+    return Utils.addHexPrefix(`${funcSig}${encoded}`)
   }
 
   /**

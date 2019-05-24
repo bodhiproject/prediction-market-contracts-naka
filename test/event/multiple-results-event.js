@@ -1,7 +1,6 @@
 const { assert } = require('chai')
 const TimeMachine = require('sol-time-machine')
 const sassert = require('sol-assert')
-
 const getConstants = require('../constants')
 const {
   toDenomination,
@@ -9,9 +8,9 @@ const {
   percentIncrease,
   currentBlockTime,
   paddedHexToAddress,
+  constructTransfer223Data,
   decodeEvent,
 } = require('../util')
-
 const NRC223PreMinted = artifacts.require('NRC223PreMinted')
 const ConfigManager = artifacts.require('ConfigManager')
 const EventFactory = artifacts.require('EventFactory')
@@ -65,12 +64,12 @@ const createEvent = async ({
   gas,
 }) => {
   try {
-    // Construct params
-    const paramsHex = web3.eth.abi.encodeParameters(
+    // Construct data
+    const data = constructTransfer223Data(
+      CREATE_EVENT_FUNC_SIG,
       createEventFuncTypes,
       eventParams,
-    ).substr(2) // Remove hex prefix
-    const data = `0x${CREATE_EVENT_FUNC_SIG}${paramsHex}`
+    )
 
     // Send tx
     const receipt = await nbotMethods['transfer(address,uint256,bytes)'](
@@ -163,7 +162,7 @@ contract('MultipleResultsEvent', (accounts) => {
     eventMethods = event.contract.methods
   })
 
-  describe('constructor', () => {
+  describe.only('constructor', () => {
     it('initializes all the values', async () => {
       assert.equal(await eventMethods.owner().call(), OWNER)
       
@@ -420,7 +419,7 @@ contract('MultipleResultsEvent', (accounts) => {
   //     })
   //   })
 
-  describe.only('bet()', () => {
+  describe('bet()', () => {
     beforeEach(async () => {
       const currTime = await currentBlockTime()
       await timeMachine.increaseTime(Number(eventParams[2]) - currTime)
