@@ -11,9 +11,9 @@ module.exports = class Utils {
   * @retun {BigNumber} The converted BigNumber.
   */
   static toDenomination(number, decimals = 0) {
-    const bn = web3.toBigNumber(number)
-    const decimalsBn = web3.toBigNumber(10 ** decimals)
-    return bn.times(decimalsBn)
+    const bn = web3.utils.toBN(number)
+    const decimalsBn = web3.utils.toBN(10 ** decimals)
+    return bn.mul(decimalsBn)
   }
 
   /*
