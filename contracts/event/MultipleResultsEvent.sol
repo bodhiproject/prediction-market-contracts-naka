@@ -443,10 +443,10 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         _currentRound = _currentRound + 1;
 
         // Update balances
-        _eventRounds[0].balances[resultIndex].total =
-            _eventRounds[0].balances[resultIndex].total.add(value);
-        _eventRounds[0].balances[resultIndex].bets[from] =
-            _eventRounds[0].balances[resultIndex].bets[from].add(value);
+        _eventRounds[1].balances[resultIndex].total =
+            _eventRounds[1].balances[resultIndex].total.add(value);
+        _eventRounds[1].balances[resultIndex].bets[from] =
+            _eventRounds[1].balances[resultIndex].bets[from].add(value);
         _resultTotals[resultIndex] = _resultTotals[resultIndex].add(value);
         _totalBets = _totalBets.add(value);
 
