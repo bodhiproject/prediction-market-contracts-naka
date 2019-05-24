@@ -420,12 +420,9 @@ contract('MultipleResultsEvent', (accounts) => {
   //     })
   //   })
 
-  describe('bet()', () => {
+  describe.only('bet()', () => {
     beforeEach(async () => {
       const currTime = await currentBlockTime()
-			console.log('NAKA: currTime', currTime)
-			console.log('NAKA: eventParams[2]', eventParams[2])
-			console.log('NAKA: diff', Number(eventParams[2]) - currTime)
       await timeMachine.increaseTime(Number(eventParams[2]) - currTime)
       assert.isAtLeast(await currentBlockTime(), Number(eventParams[2]))
       assert.isBelow(await currentBlockTime(), Number(eventParams[3]))

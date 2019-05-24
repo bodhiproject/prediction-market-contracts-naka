@@ -37,7 +37,9 @@ module.exports = class Utils {
 
   // Gets the unix time in seconds of the current block
   static async currentBlockTime() {
-    return (await web3.eth.getBlock(web3.eth.blockNumber)).timestamp
+    const blockNum = await web3.eth.getBlockNumber()
+    const block = await web3.eth.getBlock(blockNum)
+    return block.timestamp
   }
 
   /*
