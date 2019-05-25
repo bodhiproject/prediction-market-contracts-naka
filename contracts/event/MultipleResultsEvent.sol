@@ -29,7 +29,7 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         ResultBalance[11] balances;
     }
 
-    uint16 private constant VERSION = 1;
+    uint16 private constant VERSION = 2;
     uint8 private constant INVALID_RESULT_INDEX = 255;
 
     uint8 private _numOfResults;
@@ -290,10 +290,10 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         }
 
         // Calculate users portion of all rounds losers total
-        uint winningAmt = 
-            allRoundsUserBets.mul(allRoundsLosersTotal).div(allRoundsWinnersTotal);
-        uint arbitrationRewardAmt =
-            voteRoundsUserBets.mul(arbitrationReward).div(voteRoundsWinnersTotal);
+        uint winningAmt = allRoundsUserBets.mul(allRoundsLosersTotal)
+            .div(allRoundsWinnersTotal).add(allRoundsUserBets);
+        uint arbitrationRewardAmt = voteRoundsUserBets.mul(arbitrationReward)
+            .div(voteRoundsWinnersTotal);
         winningAmt = winningAmt.add(arbitrationRewardAmt);
         return winningAmt;
     }
@@ -443,10 +443,10 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         _currentRound = _currentRound + 1;
 
         // Update balances
-        _eventRounds[0].balances[resultIndex].total =
-            _eventRounds[0].balances[resultIndex].total.add(value);
-        _eventRounds[0].balances[resultIndex].bets[from] =
-            _eventRounds[0].balances[resultIndex].bets[from].add(value);
+        _eventRounds[1].balances[resultIndex].total =
+            _eventRounds[1].balances[resultIndex].total.add(value);
+        _eventRounds[1].balances[resultIndex].bets[from] =
+            _eventRounds[1].balances[resultIndex].bets[from].add(value);
         _resultTotals[resultIndex] = _resultTotals[resultIndex].add(value);
         _totalBets = _totalBets.add(value);
 

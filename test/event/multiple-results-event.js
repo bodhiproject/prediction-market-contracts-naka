@@ -1,7 +1,6 @@
 const { assert } = require('chai')
 const TimeMachine = require('sol-time-machine')
 const sassert = require('sol-assert')
-
 const getConstants = require('../constants')
 const {
   toDenomination,
@@ -9,9 +8,9 @@ const {
   percentIncrease,
   currentBlockTime,
   paddedHexToAddress,
+  constructTransfer223Data,
   decodeEvent,
 } = require('../util')
-
 const NRC223PreMinted = artifacts.require('NRC223PreMinted')
 const ConfigManager = artifacts.require('ConfigManager')
 const EventFactory = artifacts.require('EventFactory')
@@ -20,17 +19,9 @@ const MultipleResultsEvent = artifacts.require('MultipleResultsEvent')
 const web3 = global.web3
 
 const CREATE_EVENT_FUNC_SIG = '2b2601bf'
+const BET_FUNC_SIG = '885ab66d'
 const RESULT_INVALID = 'Invalid'
-const BET_TOKEN_DECIMALS = 18
-const createEventFuncTypes = [
-  'string',
-  'bytes32[10]',
-  'uint256',
-  'uint256',
-  'uint256',
-  'uint256',
-  'address',
-]
+const BET_TOKEN_DECIMALS = 8
 
 const getEventParams = async (cOracle) => {
   const currTime = await currentBlockTime()
@@ -65,12 +56,12 @@ const createEvent = async ({
   gas,
 }) => {
   try {
-    // Construct params
-    const paramsHex = web3.eth.abi.encodeParameters(
-      createEventFuncTypes,
+    // Construct data
+    const data = constructTransfer223Data(
+      CREATE_EVENT_FUNC_SIG,
+      ['string', 'bytes32[10]', 'uint256', 'uint256', 'uint256', 'uint256', 'address'],
       eventParams,
-    ).substr(2) // Remove hex prefix
-    const data = `0x${CREATE_EVENT_FUNC_SIG}${paramsHex}`
+    )
 
     // Send tx
     const receipt = await nbotMethods['transfer(address,uint256,bytes)'](
@@ -168,7 +159,7 @@ contract('MultipleResultsEvent', (accounts) => {
       assert.equal(await eventMethods.owner().call(), OWNER)
       
       const eventMeta = await eventMethods.eventMetadata().call()
-      assert.equal(eventMeta[0], 0)
+      assert.equal(eventMeta[0], 2)
       assert.equal(eventMeta[1], 'Test Event 1')
       assert.equal(web3.utils.toUtf8(eventMeta[2][0]), RESULT_INVALID)
       assert.equal(web3.utils.toUtf8(eventMeta[2][1]), 'A')
@@ -420,24 +411,24 @@ contract('MultipleResultsEvent', (accounts) => {
   //     })
   //   })
 
-  describe('bet()', () => {
+  describe.only('bet()', () => {
     beforeEach(async () => {
       const currTime = await currentBlockTime()
-			console.log('NAKA: currTime', currTime)
-			console.log('NAKA: eventParams[2]', eventParams[2])
-			console.log('NAKA: diff', Number(eventParams[2]) - currTime)
       await timeMachine.increaseTime(Number(eventParams[2]) - currTime)
       assert.isAtLeast(await currentBlockTime(), Number(eventParams[2]))
       assert.isBelow(await currentBlockTime(), Number(eventParams[3]))
     })
 
     it('allows users to bet', async () => {
-      const betAmt = toDenomination(1, BET_TOKEN_DECIMALS)
-      const betResultIndex = 0
-      await eventMethods.bet(betResultIndex).send({ from: ACCT1, value: betAmt })
-
-      const totalAmts = await eventMethods.totalAmounts().call()
-      assert.equal(totalAmts[0], betAmt)
+      const amt = toDenomination(1, BET_TOKEN_DECIMALS)
+      const resultIndex = 0
+      const data = constructTransfer223Data(BET_FUNC_SIG, ['uint8'], [resultIndex])
+      await nbotMethods['transfer(address,uint256,bytes)'](
+        eventAddr,
+        amt,
+        web3.utils.hexToBytes(data),
+      ).send({ from: OWNER, gas: 200000 })
+      assert.equal(await eventMethods.totalBets().call(), amt)
     })
   })
 

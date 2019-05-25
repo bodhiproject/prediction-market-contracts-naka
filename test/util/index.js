@@ -1,19 +1,30 @@
-const { find, each, isPlainObject, isArray } = require('lodash')
+const { find, each, isPlainObject, isArray, isString } = require('lodash')
 
 const web3 = global.web3
 
 module.exports = class Utils {
-  /*
-  * Converts the amount to a lower denomination as a BigNumber.
-  * eg. (number: 1, decimals: 4) = 10000
-  * @param number {BigNumber|number|string} The number to convert.
-  * @param decimals {number} The denomination number of decimals to convert to.
-  * @retun {BigNumber} The converted BigNumber.
-  */
-  static toDenomination(number, decimals = 0) {
-    const bn = web3.toBigNumber(number)
-    const decimalsBn = web3.toBigNumber(10 ** decimals)
-    return bn.times(decimalsBn)
+  static addHexPrefix(str) {
+    if (!isString(str)) return str
+    if (!str.startsWith('0x')) return `0x${str}`
+    return str
+  }
+
+  static removeHexPrefix(str) {
+    if (!isString(str)) return str
+    if (str.startsWith('0x')) return str.substr(2)
+    return str
+  }
+
+  /**
+   * Converts the amount to a lower denomination.
+   * @param {number|string} amount Amount to convert
+   * @param {number} decimals Number of decimals
+   * @return {string} Amount as string number
+   */
+  static toDenomination(amount, decimals = 0) {
+    const bn = web3.utils.toBN(amount)
+    const decimalsBn = web3.utils.toBN(10 ** decimals)
+    return bn.mul(decimalsBn).toString(10)
   }
 
   /*
@@ -37,7 +48,9 @@ module.exports = class Utils {
 
   // Gets the unix time in seconds of the current block
   static async currentBlockTime() {
-    return (await web3.eth.getBlock(web3.eth.blockNumber)).timestamp
+    const blockNum = await web3.eth.getBlockNumber()
+    const block = await web3.eth.getBlock(blockNum)
+    return block.timestamp
   }
 
   /*
@@ -50,6 +63,11 @@ module.exports = class Utils {
     const regex = new RegExp(/(0x)(0+)([a-fA-F0-9]{40})/)
     const matches = regex.exec(hexString)
     return matches && matches[1] + matches[3]
+  }
+
+  static constructTransfer223Data(funcSig, types, params) {
+    const encoded = Utils.removeHexPrefix(web3.eth.abi.encodeParameters(types, params))
+    return Utils.addHexPrefix(`${funcSig}${encoded}`)
   }
 
   /**
