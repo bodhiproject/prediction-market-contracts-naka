@@ -21,7 +21,6 @@ contract EventFactory is NRC223Receiver {
     address private _configManager;
     address private _bodhiTokenAddress;
     mapping(address => EventEscrow) private _escrows;
-    mapping(bytes32 => MultipleResultsEvent) private _events;
 
     // Events
     event MultipleResultsEventCreated(
@@ -138,20 +137,16 @@ contract EventFactory is NRC223Receiver {
             }
         }
 
-        // Event should not exist yet
-        bytes32 eventHash = getMultipleResultsEventHash(
-            eventName, results, numOfResults, betStartTime, betEndTime, 
-            resultSetStartTime, resultSetEndTime);
-        require(address(_events[eventHash]) == address(0), "Event already exists");
-
         // Create event
         MultipleResultsEvent mrEvent = new MultipleResultsEvent(
             creator, eventName, results, numOfResults, betStartTime,
             betEndTime, resultSetStartTime, resultSetEndTime, centralizedOracle, 
             _configManager);
+        uint arbitrationLength =
+            IConfigManager(_configManager).arbitrationLength(escrowDeposited);
+        mrEvent.setEscrowAndArbitrationLength(escrowDeposited, arbitrationLength);
 
-        // Store escrow entry and event
-        _events[eventHash] = mrEvent;
+        // Store escrow info
         _escrows[address(mrEvent)].depositer = creator;
         _escrows[address(mrEvent)].amount = escrowDeposited;
 
@@ -162,31 +157,5 @@ contract EventFactory is NRC223Receiver {
         emit MultipleResultsEventCreated(address(mrEvent), creator);
 
         return mrEvent;
-    }
-
-    /// @dev Gets the hash based of the event parameters.
-    /// @param eventName Question or statement prediction.
-    /// @param eventResults Possible results.
-    /// @param numOfResults Number of results.
-    /// @param betStartTime Unix time when betting will start.
-    /// @param betEndTime Unix time when betting will end.
-    /// @param resultSetStartTime Unix time when the CentralizedOracle can set the result.
-    /// @param resultSetEndTime Unix time when anyone can set the result.
-    /// @return Hash of the event params.
-    function getMultipleResultsEventHash(
-        string memory eventName,
-        bytes32[11] memory eventResults,
-        uint8 numOfResults,
-        uint betStartTime,
-        uint betEndTime,
-        uint resultSetStartTime,
-        uint resultSetEndTime)
-        private
-        pure
-        returns (bytes32)
-    {
-        return keccak256(
-            abi.encodePacked(eventName, eventResults, numOfResults, betStartTime, 
-            betEndTime, resultSetStartTime, resultSetEndTime));
     }
 }
