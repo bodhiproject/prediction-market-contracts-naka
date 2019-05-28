@@ -133,14 +133,14 @@ contract ConfigManager is IConfigManager, Ownable {
     }
 
     function arbitrationLength(uint escrowAmount) external view returns (uint256) {
-        if (escrowAmount >= 100000 * (10 ** TOKEN_DECIMALS)) {
+        if (escrowAmount >= _eventEscrowAmount * 1000) { // Base escrow * 100000%
             return 6 * 60 * 60; // 6 hours
-        } else if (escrowAmount >= 10000 * (10 ** TOKEN_DECIMALS)) {
+        } else if (escrowAmount >= _eventEscrowAmount * 100) { // Base escrow * 10000%
             return 12 * 60 * 60; // 12 hours
-        } else if (escrowAmount >= 1000 * (10 ** TOKEN_DECIMALS)) {
+        } else if (escrowAmount >= _eventEscrowAmount * 10) { // Base escrow * 1000%
             return 24 * 60 * 60; // 24 hours
         } else {
-            return 24 * 60 * 60; // 48 hours
+            return 48 * 60 * 60; // 48 hours
         }
     }
 
