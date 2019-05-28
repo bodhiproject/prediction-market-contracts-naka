@@ -153,7 +153,7 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         assert(_bodhiTokenAddress != address(0));
         _eventFactoryAddress = config.eventFactoryAddress();
         assert(_eventFactoryAddress != address(0));
-        _escrowAmount = config.eventEscrowAmount();
+        // _escrowAmount = config.eventEscrowAmount();
         _arbitrationLength = config.arbitrationLength();
         _arbitrationRewardPercentage = config.arbitrationRewardPercentage();
         _thresholdPercentIncrease = config.thresholdPercentIncrease();
@@ -197,6 +197,18 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         } else {
             revert("Unhandled function in tokenFallback");
         }
+    }
+
+    /// @dev Sets the escrow amount deposited after creation.
+    /// @param escrowAmount Escrow amount already deposited.
+    function setEscrowAmount(uint escrowAmount) external {
+        require(
+            msg.sender == _eventFactoryAddress,
+            "Only the EventFactory can call this.");
+
+        _escrowAmount = escrowAmount;
+
+        
     }
 
     /// @notice Withdraw winnings if the DecentralizedOracle round arbitrationEndTime has passed.
