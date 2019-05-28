@@ -9,9 +9,9 @@ contract ConfigManager is IConfigManager, Ownable {
     uint8 private _arbitrationRewardPercentage = 1;
     address private _bodhiTokenAddress;
     address private _eventFactoryAddress;
-    uint256 private _eventEscrowAmount = 100 * (10 ** TOKEN_DECIMALS);
-    uint256 private _arbitrationLength = 24 * 60 * 60; // 1 day
-    uint256 private _startingOracleThreshold = 100 * (10 ** TOKEN_DECIMALS);
+    uint256 private _eventEscrowAmount = 100 * (10 ** TOKEN_DECIMALS); // 100 NBOT
+    uint256 private _arbitrationLength = 48 * 60 * 60; // 48 hours
+    uint256 private _startingOracleThreshold = 100 * (10 ** TOKEN_DECIMALS); // 100 NBOT
     uint256 private _thresholdPercentIncrease = 10;
     mapping(address => bool) private _whitelistedContracts;
 
@@ -134,13 +134,13 @@ contract ConfigManager is IConfigManager, Ownable {
 
     function arbitrationLength(uint escrowAmount) external view returns (uint256) {
         if (escrowAmount >= _eventEscrowAmount * 1000) { // Base escrow * 100000%
-            return 6 * 60 * 60; // 6 hours
+            return _arbitrationLength / (2 ** 3); // 6 hours
         } else if (escrowAmount >= _eventEscrowAmount * 100) { // Base escrow * 10000%
-            return 12 * 60 * 60; // 12 hours
+            return _arbitrationLength / (2 ** 2); // 12 hours
         } else if (escrowAmount >= _eventEscrowAmount * 10) { // Base escrow * 1000%
-            return 24 * 60 * 60; // 24 hours
+            return _arbitrationLength / 2; // 24 hours
         } else {
-            return 48 * 60 * 60; // 48 hours
+            return _arbitrationLength; // 48 hours
         }
     }
 
