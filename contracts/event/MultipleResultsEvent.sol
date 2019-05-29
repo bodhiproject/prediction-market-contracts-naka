@@ -109,7 +109,7 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
     /// @param resultSetStartTime Unix time when the CentralizedOracle can set the result.
     /// @param resultSetEndTime Unix time when anyone can set the result.
     /// @param centralizedOracle Address of the user that will decide the result.
-    /// @param arbitrationLength Length of arbitration rounds in seconds.
+    /// @param arbitrationOptionIndex Index of the selected arbitration option.
     /// @param arbitrationRewardPercentage Percentage of loser's bets going to winning arbitrators.
     /// @param configManager Address of the ConfigManager.
     constructor(
@@ -122,7 +122,7 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         uint resultSetStartTime,
         uint resultSetEndTime,
         address centralizedOracle,
-        uint arbitrationLength,
+        uint arbitrationOptionIndex,
         uint arbitrationRewardPercentage,
         address configManager)
         Ownable(owner)
@@ -141,7 +141,9 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         require(
             resultSetEndTime > resultSetStartTime,
             "resultSetEndTime should be > resultSetStartTime");
-        require(arbitrationLength > 0, "arbitrationLength should be > 0");
+        require(
+            arbitrationOptionIndex < 4,
+            "arbitrationOptionIndex should be < 4");
         require(
             arbitrationRewardPercentage < 100,
             "arbitrationRewardPercentage should be < 100");
@@ -154,7 +156,7 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         _resultSetStartTime = resultSetStartTime;
         _resultSetEndTime = resultSetEndTime;
         _centralizedOracle = centralizedOracle;
-        _arbitrationLength = arbitrationLength;
+        // _arbitrationLength = arbitrationLength;
         _arbitrationRewardPercentage = arbitrationRewardPercentage;
 
         // Fetch current config

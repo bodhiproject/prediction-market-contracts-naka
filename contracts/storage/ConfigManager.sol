@@ -10,8 +10,18 @@ contract ConfigManager is IConfigManager, Ownable {
     address private _bodhiTokenAddress;
     address private _eventFactoryAddress;
     uint private _eventEscrowAmount = 100 * (10 ** TOKEN_DECIMALS); // 100 NBOT
-    uint private _arbitrationLength = 48 * 60 * 60; // 48 hours
-    uint private _startingConsensusThreshold = 100 * (10 ** TOKEN_DECIMALS); // 100 NBOT
+    uint[4] private _arbitrationLength = [
+        172800, // 48 hours
+        86400, // 24 hours
+        43200, // 12 hours
+        21600 // 6 hours
+    ];
+    uint[4] private _startingConsensusThreshold = [
+        100 * (10 ** TOKEN_DECIMALS),
+        1000 * (10 ** TOKEN_DECIMALS),
+        5000 * (10 ** TOKEN_DECIMALS),
+        10000 * (10 ** TOKEN_DECIMALS)
+    ];
     uint private _thresholdPercentIncrease = 10;
     mapping(address => bool) private _whitelistedContracts;
 
@@ -80,13 +90,15 @@ contract ConfigManager is IConfigManager, Ownable {
     }
 
     /// @dev Sets the arbitration length.
-    /// @param newLength The new length in seconds (unix time) of an arbitration period.
+    /// @param newLength New lengths of arbitration times (unix time seconds).
     function setArbitrationLength(
-        uint newLength)
+        uint[4] newLength)
         external
         onlyOwner
     {   
-        require(newLength > 0, "newLength should be > 0");
+        for (uint8 i = 0; i < 4; i++) {
+            require(newLength[i] > 0, "Arbitration time should be > 0");
+        }
         _arbitrationLength = newLength;
     }
 
@@ -103,10 +115,13 @@ contract ConfigManager is IConfigManager, Ownable {
     /// @dev Sets the starting betting threshold.
     /// @param newThreshold The new consensus threshold for the betting round.
     function setStartingConsensusThreshold(
-        uint newThreshold)
+        uint[4] newThreshold)
         external
         onlyOwner
     {
+        for (uint8 i = 0; i < 4; i++) {
+            require(newThreshold[i] > 0, "Consensus threshold should be > 0");
+        }
         _startingConsensusThreshold = newThreshold;
     }
 
@@ -118,23 +133,6 @@ contract ConfigManager is IConfigManager, Ownable {
         onlyOwner
     {
         _thresholdPercentIncrease = newPercentage;
-    }
-
-    /// @dev Calculates the starting consensus threshold based on the arbitration length.
-    /// @param length Arbitration length when creating an event.
-    /// @return Starting consensus threshold.
-    function calculateThreshold(uint length) external view returns (uint) {
-        if (length == _arbitrationLength) { // 48 hours
-            return _startingConsensusThreshold;
-        } else if (length == (_arbitrationLength / 2)) { // 24 hours
-            return _startingConsensusThreshold * 10; // Base * 1000%
-        } else if (length == (_arbitrationLength / 4)) { // 12 hours
-            return _startingConsensusThreshold * 50; // Base * 5000%
-        } else if (length == (_arbitrationLength / 8)) { // 6 hours
-            return _startingConsensusThreshold * 100; // Base * 10000%
-        } else {
-            return 0;
-        }
     }
 
     function bodhiTokenAddress() external view returns (address) {
@@ -149,11 +147,11 @@ contract ConfigManager is IConfigManager, Ownable {
         return _eventEscrowAmount;
     }
 
-    function defaultArbitrationLength() external view returns (uint) {
+    function arbitrationLength() external view returns (uint[4]) {
         return _arbitrationLength;
     }
 
-    function defaultStartingConsensusThreshold() external view returns (uint) {
+    function startingConsensusThreshold() external view returns (uint[4]) {
         return _startingConsensusThreshold;
     }
 

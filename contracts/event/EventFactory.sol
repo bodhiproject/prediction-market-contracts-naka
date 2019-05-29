@@ -94,12 +94,12 @@ contract EventFactory is NRC223Receiver {
         (string memory eventName, bytes32[3] memory eventResults, 
             uint betStartTime, uint betEndTime, uint resultSetStartTime,
             uint resultSetEndTime, address centralizedOracle,
-            uint arbitrationLength, uint arbitrationRewardPercentage) =
+            uint arbitrationOptionIndex, uint arbitrationRewardPercentage) =
             abi.decode(params, (string, bytes32[3], uint, uint, uint, uint, 
             address, uint, uint));
         return createMultipleResultsEvent(from, value, eventName, eventResults, 
             betStartTime, betEndTime, resultSetStartTime, resultSetEndTime, 
-            centralizedOracle, arbitrationLength, arbitrationRewardPercentage);
+            centralizedOracle, arbitrationOptionIndex, arbitrationRewardPercentage);
     }
 
     /// @dev Creates a new MultipleResultsEvent. Only tokenFallback can call this.
@@ -112,7 +112,7 @@ contract EventFactory is NRC223Receiver {
     /// @param resultSetStartTime Unix time when the CentralizedOracle can set the result.
     /// @param resultSetEndTime Unix time when anyone can set the result.
     /// @param centralizedOracle Address of the user that will decide the result.
-    /// @param arbitrationLength Length of arbitration rounds in seconds.
+    /// @param arbitrationOptionIndex Index of the selected arbitration option.
     /// @param arbitrationRewardPercentage Percentage of loser's bets going to winning arbitrators.
     /// @return New MultipleResultsEvent.
     function createMultipleResultsEvent(
@@ -125,7 +125,7 @@ contract EventFactory is NRC223Receiver {
         uint resultSetStartTime,
         uint resultSetEndTime,
         address centralizedOracle,
-        uint arbitrationLength,
+        uint8 arbitrationOptionIndex,
         uint arbitrationRewardPercentage)
         private
         returns (MultipleResultsEvent)
@@ -154,7 +154,7 @@ contract EventFactory is NRC223Receiver {
         MultipleResultsEvent mrEvent = new MultipleResultsEvent(
             creator, eventName, results, numOfResults, betStartTime,
             betEndTime, resultSetStartTime, resultSetEndTime, centralizedOracle, 
-            arbitrationLength, arbitrationRewardPercentage, _configManager);
+            arbitrationOptionIndex, arbitrationRewardPercentage, _configManager);
 
         // Store escrow info
         _escrows[address(mrEvent)].depositer = creator;
