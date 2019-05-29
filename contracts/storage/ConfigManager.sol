@@ -91,7 +91,7 @@ contract ConfigManager is IConfigManager, Ownable {
     /// @dev Sets the arbitration length.
     /// @param newLength New lengths of arbitration times (unix time seconds).
     function setArbitrationLength(
-        uint[4] newLength)
+        uint[4] calldata newLength)
         external
         onlyOwner
     {   
@@ -104,7 +104,7 @@ contract ConfigManager is IConfigManager, Ownable {
     /// @dev Sets the starting betting threshold.
     /// @param newThreshold The new consensus threshold for the betting round.
     function setStartingConsensusThreshold(
-        uint[4] newThreshold)
+        uint[4] calldata newThreshold)
         external
         onlyOwner
     {
@@ -136,11 +136,11 @@ contract ConfigManager is IConfigManager, Ownable {
         return _eventEscrowAmount;
     }
 
-    function arbitrationLength() external view returns (uint[4]) {
+    function arbitrationLength() external view returns (uint[4] memory) {
         return _arbitrationLength;
     }
 
-    function startingConsensusThreshold() external view returns (uint[4]) {
+    function startingConsensusThreshold() external view returns (uint[4] memory) {
         return _startingConsensusThreshold;
     }
 
