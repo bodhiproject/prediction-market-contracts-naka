@@ -132,10 +132,6 @@ contract ConfigManager is IConfigManager, Ownable {
         return _eventEscrowAmount;
     }
 
-    function arbitrationRewardPercentage() external view returns (uint8) {
-        return _arbitrationRewardPercentage;
-    }
-
     function startingOracleThreshold() external view returns (uint256) {
         return _startingOracleThreshold;
     }
