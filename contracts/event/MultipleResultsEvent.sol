@@ -163,12 +163,12 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         _escrowAmount = config.eventEscrowAmount();
         _thresholdPercentIncrease = config.thresholdPercentIncrease();
 
+        // Calculate Consensus Threshold
+        uint startingThreshold = config.calculateThreshold(_arbitrationLength);
+        require(startingThreshold > 0, "Invalid arbitrationLength");
+
         // Init CentralizedOracle round
-        initEventRound(
-            0,
-            INVALID_RESULT_INDEX,
-            config.startingOracleThreshold(),
-            0);
+        initEventRound(0, INVALID_RESULT_INDEX, startingThreshold, 0);
     }
 
     /// @dev Standard NRC223 function that will handle incoming token transfers.
