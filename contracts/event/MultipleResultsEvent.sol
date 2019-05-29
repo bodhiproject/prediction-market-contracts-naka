@@ -156,7 +156,6 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         _resultSetStartTime = resultSetStartTime;
         _resultSetEndTime = resultSetEndTime;
         _centralizedOracle = centralizedOracle;
-        // _arbitrationLength = arbitrationLength;
         _arbitrationRewardPercentage = arbitrationRewardPercentage;
 
         // Fetch current config
@@ -166,14 +165,16 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         _eventFactoryAddress = config.eventFactoryAddress();
         assert(_eventFactoryAddress != address(0));
         _escrowAmount = config.eventEscrowAmount();
+        _arbitrationLength = config.arbitrationLength()[arbitrationOptionIndex];
         _thresholdPercentIncrease = config.thresholdPercentIncrease();
 
-        // Calculate Consensus Threshold
-        uint startingThreshold = config.calculateThreshold(_arbitrationLength);
-        require(startingThreshold > 0, "Invalid arbitrationLength");
-
         // Init CentralizedOracle round
-        initEventRound(0, INVALID_RESULT_INDEX, startingThreshold, 0);
+        initEventRound(
+            0,
+            INVALID_RESULT_INDEX,
+            config.startingConsensusThreshold()[arbitrationOptionIndex],
+            0
+        );
     }
 
     /// @dev Standard NRC223 function that will handle incoming token transfers.
