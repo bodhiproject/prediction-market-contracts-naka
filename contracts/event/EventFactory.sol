@@ -51,20 +51,11 @@ contract EventFactory is NRC223Receiver {
         require(msg.sender == _bodhiTokenAddress, "Only NBOT is accepted");
         require(data.length >= 4, "Data is not long enough.");
 
-        bytes memory createMultipleResultsEventFunc = hex"2b2601bf";
         bytes memory funcHash = data.sliceBytes(0, 4);
         bytes memory params = data.sliceBytes(4, data.length - 4);
-
         bytes32 encodedFunc = keccak256(abi.encodePacked(funcHash));
-        if (encodedFunc == keccak256(abi.encodePacked(createMultipleResultsEventFunc))) {
-            (string memory eventName, bytes32[10] memory eventResults, 
-                uint betStartTime, uint betEndTime, uint resultSetStartTime,
-                uint resultSetEndTime, address centralizedOracle) = 
-                abi.decode(params, (string, bytes32[10], uint256, uint256, 
-                uint256, uint256, address));
-            createMultipleResultsEvent(from, value, eventName, eventResults, 
-                betStartTime, betEndTime, resultSetStartTime, resultSetEndTime, 
-                centralizedOracle);
+        if (encodedFunc == keccak256(abi.encodePacked(hex"2b2601bf"))) {
+            handleCreateMultipleResultsEvent(from, value, params);
         } else {
             revert("Unhandled function in tokenFallback");
         }
@@ -93,6 +84,24 @@ contract EventFactory is NRC223Receiver {
         return _escrows[msg.sender].didWithdraw;
     }
 
+    function handleCreateMultipleResultsEvent(
+        address from,
+        uint value,
+        bytes memory params)
+        private
+        returns (MultipleResultsEvent)
+    {
+        (string memory eventName, bytes32[3] memory eventResults, 
+            uint betStartTime, uint betEndTime, uint resultSetStartTime,
+            uint resultSetEndTime, address centralizedOracle,
+            uint arbitrationLength, uint arbitrationRewardPercentage) =
+            abi.decode(params, (string, bytes32[3], uint, uint, uint, uint, 
+            address, uint, uint));
+        return createMultipleResultsEvent(from, value, eventName, eventResults, 
+            betStartTime, betEndTime, resultSetStartTime, resultSetEndTime, 
+            centralizedOracle, arbitrationLength, arbitrationRewardPercentage);
+    }
+
     /// @dev Creates a new MultipleResultsEvent. Only tokenFallback can call this.
     /// @param creator Address of the creator.
     /// @param escrowDeposited Amount of escrow deposited to create the event.
@@ -103,17 +112,21 @@ contract EventFactory is NRC223Receiver {
     /// @param resultSetStartTime Unix time when the CentralizedOracle can set the result.
     /// @param resultSetEndTime Unix time when anyone can set the result.
     /// @param centralizedOracle Address of the user that will decide the result.
+    /// @param arbitrationLength Length of arbitration rounds in seconds.
+    /// @param arbitrationRewardPercentage Percentage of loser's bets going to winning arbitrators.
     /// @return New MultipleResultsEvent.
     function createMultipleResultsEvent(
         address creator,
         uint escrowDeposited,
         string memory eventName,
-        bytes32[10] memory eventResults,
+        bytes32[3] memory eventResults,
         uint betStartTime,
         uint betEndTime,
         uint resultSetStartTime,
         uint resultSetEndTime,
-        address centralizedOracle)
+        address centralizedOracle,
+        uint arbitrationLength,
+        uint arbitrationRewardPercentage)
         private
         returns (MultipleResultsEvent)
     {   
@@ -122,12 +135,12 @@ contract EventFactory is NRC223Receiver {
         require(escrowDeposited >= escrowAmount, "Escrow deposit is not enough");
 
         // Add Invalid result to eventResults
-        bytes32[11] memory results;
+        bytes32[4] memory results;
         uint8 numOfResults;
-
         results[0] = "Invalid";
         numOfResults++;
 
+        // Copy results to new array with Invalid option
         for (uint i = 0; i < eventResults.length; i++) {
             if (!eventResults[i].isEmpty()) {
                 results[i + 1] = eventResults[i];
@@ -141,10 +154,7 @@ contract EventFactory is NRC223Receiver {
         MultipleResultsEvent mrEvent = new MultipleResultsEvent(
             creator, eventName, results, numOfResults, betStartTime,
             betEndTime, resultSetStartTime, resultSetEndTime, centralizedOracle, 
-            _configManager);
-        uint arbitrationLength =
-            IConfigManager(_configManager).arbitrationLength(escrowDeposited);
-        mrEvent.setEscrowAndArbitrationLength(escrowDeposited, arbitrationLength);
+            arbitrationLength, arbitrationRewardPercentage, _configManager);
 
         // Store escrow info
         _escrows[address(mrEvent)].depositer = creator;

@@ -36,7 +36,7 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
     uint8 private _currentRound = 0;
     uint8 private _currentResultIndex = INVALID_RESULT_INDEX;
     string private _eventName;
-    bytes32[11] private _eventResults;
+    bytes32[4] private _eventResults;
     address private _bodhiTokenAddress;
     address private _eventFactoryAddress;
     address private _centralizedOracle;
@@ -109,17 +109,21 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
     /// @param resultSetStartTime Unix time when the CentralizedOracle can set the result.
     /// @param resultSetEndTime Unix time when anyone can set the result.
     /// @param centralizedOracle Address of the user that will decide the result.
+    /// @param arbitrationLength Length of arbitration rounds in seconds.
+    /// @param arbitrationRewardPercentage Percentage of loser's bets going to winning arbitrators.
     /// @param configManager Address of the ConfigManager.
     constructor(
         address owner,
         string memory eventName,
-        bytes32[11] memory eventResults,
+        bytes32[4] memory eventResults,
         uint8 numOfResults,
         uint betStartTime,
         uint betEndTime,
         uint resultSetStartTime,
         uint resultSetEndTime,
         address centralizedOracle,
+        uint arbitrationLength,
+        uint arbitrationRewardPercentage,
         address configManager)
         Ownable(owner)
         public
@@ -146,6 +150,8 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         _resultSetStartTime = resultSetStartTime;
         _resultSetEndTime = resultSetEndTime;
         _centralizedOracle = centralizedOracle;
+        _arbitrationLength = arbitrationLength;
+        _arbitrationRewardPercentage = arbitrationRewardPercentage;
 
         // Fetch current config
         IConfigManager config = IConfigManager(configManager);
@@ -153,7 +159,7 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         assert(_bodhiTokenAddress != address(0));
         _eventFactoryAddress = config.eventFactoryAddress();
         assert(_eventFactoryAddress != address(0));
-        _arbitrationRewardPercentage = config.arbitrationRewardPercentage();
+        _escrowAmount = config.eventEscrowAmount();
         _thresholdPercentIncrease = config.thresholdPercentIncrease();
 
         // Init CentralizedOracle round
@@ -195,22 +201,6 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         } else {
             revert("Unhandled function in tokenFallback");
         }
-    }
-
-    /// @dev Sets the escrow amount and arbitration length. Should be called after creation.
-    /// @param escrowAmount Escrow amount already deposited.
-    /// @param arbitrationLength Arbitration length based on escrow amount.
-    function setEscrowAndArbitrationLength(
-        uint escrowAmount,
-        uint arbitrationLength)
-        external
-    {
-        require(
-            msg.sender == _eventFactoryAddress,
-            "Only the EventFactory can call this.");
-
-        _escrowAmount = escrowAmount;
-        _arbitrationLength = arbitrationLength;
     }
 
     /// @notice Withdraw winnings if the DecentralizedOracle round arbitrationEndTime has passed.
@@ -335,7 +325,7 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
     function eventMetadata()
         public
         view
-        returns (uint16, string memory, bytes32[11] memory, uint8)
+        returns (uint16, string memory, bytes32[4] memory, uint8)
     {
         return (
             VERSION,
