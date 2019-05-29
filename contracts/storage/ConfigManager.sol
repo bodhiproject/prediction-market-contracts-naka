@@ -6,7 +6,6 @@ import "../lib/Ownable.sol";
 contract ConfigManager is IConfigManager, Ownable {
     uint private constant TOKEN_DECIMALS = 8;
 
-    uint8 private _arbitrationRewardPercentage = 1;
     address private _bodhiTokenAddress;
     address private _eventFactoryAddress;
     uint private _eventEscrowAmount = 100 * (10 ** TOKEN_DECIMALS); // 100 NBOT
@@ -100,16 +99,6 @@ contract ConfigManager is IConfigManager, Ownable {
             require(newLength[i] > 0, "Arbitration time should be > 0");
         }
         _arbitrationLength = newLength;
-    }
-
-    /// @dev Sets the arbitration reward percentage.
-    /// @param newPercentage New percentage of the arbitration participation reward (e.g. 5)
-    function setArbitrationRewardPercentage(
-        uint8 newPercentage)
-        external
-        onlyOwner
-    {
-        _arbitrationRewardPercentage = newPercentage;
     }
 
     /// @dev Sets the starting betting threshold.

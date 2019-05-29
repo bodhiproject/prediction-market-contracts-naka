@@ -122,7 +122,7 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         uint resultSetStartTime,
         uint resultSetEndTime,
         address centralizedOracle,
-        uint arbitrationOptionIndex,
+        uint8 arbitrationOptionIndex,
         uint arbitrationRewardPercentage,
         address configManager)
         Ownable(owner)
