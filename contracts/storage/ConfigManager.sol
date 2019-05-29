@@ -124,13 +124,13 @@ contract ConfigManager is IConfigManager, Ownable {
     /// @param length Arbitration length when creating an event.
     /// @return Starting consensus threshold.
     function calculateThreshold(uint length) external view returns (uint) {
-        if (length === _arbitrationLength) { // 48 hours
+        if (length == _arbitrationLength) { // 48 hours
             return _startingConsensusThreshold;
-        } else if (length === (_arbitrationLength / 2)) { // 24 hours
+        } else if (length == (_arbitrationLength / 2)) { // 24 hours
             return _startingConsensusThreshold * 10; // Base * 1000%
-        } else if (length === (_arbitrationLength / 4)) { // 12 hours
+        } else if (length == (_arbitrationLength / 4)) { // 12 hours
             return _startingConsensusThreshold * 50; // Base * 5000%
-        } else if (length === (_arbitrationLength / 8)) { // 6 hours
+        } else if (length == (_arbitrationLength / 8)) { // 6 hours
             return _startingConsensusThreshold * 100; // Base * 10000%
         } else {
             return 0;
