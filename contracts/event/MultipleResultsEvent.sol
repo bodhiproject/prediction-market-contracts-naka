@@ -468,7 +468,6 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
             arbitrationEndTime);
 
         // Emit events
-        emit BetPlaced(address(this), from, resultIndex, value, 0);
         emit ResultSet(address(this), from, resultIndex, value, 0,
             nextThreshold, arbitrationEndTime);
     }
