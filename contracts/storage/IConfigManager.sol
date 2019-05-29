@@ -5,7 +5,6 @@ contract IConfigManager {
     function bodhiTokenAddress() external view returns (address);
     function eventFactoryAddress() external view returns (address);
     function eventEscrowAmount() external view returns (uint256);
-    function arbitrationLength(uint escrowAmount) external view returns (uint256);
     function arbitrationRewardPercentage() external view returns (uint8);
     function startingOracleThreshold() external view returns (uint256);
     function thresholdPercentIncrease() external view returns (uint256);
