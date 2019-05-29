@@ -142,6 +142,9 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
             resultSetEndTime > resultSetStartTime,
             "resultSetEndTime should be > resultSetStartTime");
         require(arbitrationLength > 0, "arbitrationLength should be > 0");
+        require(
+            arbitrationRewardPercentage < 100,
+            "arbitrationRewardPercentage should be < 100");
 
         _eventName = eventName;
         _eventResults = eventResults;
