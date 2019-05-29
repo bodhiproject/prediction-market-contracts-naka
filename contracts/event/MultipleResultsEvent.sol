@@ -26,7 +26,7 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         uint8 resultIndex;
         uint consensusThreshold;
         uint arbitrationEndTime;
-        ResultBalance[11] balances;
+        ResultBalance[4] balances;
     }
 
     uint16 private constant VERSION = 2;
@@ -49,7 +49,7 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
     uint private _thresholdPercentIncrease;
     uint private _arbitrationRewardPercentage;
     uint private _totalBets;
-    uint[11] private _resultTotals;
+    uint[4] private _resultTotals;
     mapping(uint8 => EventRound) private _eventRounds;
     mapping(address => bool) private _didWithdraw;
 
