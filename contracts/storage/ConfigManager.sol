@@ -120,6 +120,9 @@ contract ConfigManager is IConfigManager, Ownable {
         _thresholdPercentIncrease = newPercentage;
     }
 
+    /// @dev Calculates the starting consensus threshold based on the arbitration length.
+    /// @param length Arbitration length when creating an event.
+    /// @return Starting consensus threshold.
     function calculateThreshold(uint length) external view returns (uint) {
         if (length === _arbitrationLength) { // 48 hours
             return _startingConsensusThreshold;
