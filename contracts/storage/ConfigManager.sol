@@ -4,15 +4,15 @@ import "./IConfigManager.sol";
 import "../lib/Ownable.sol";
 
 contract ConfigManager is IConfigManager, Ownable {
-    uint256 private constant TOKEN_DECIMALS = 8;
+    uint private constant TOKEN_DECIMALS = 8;
 
     uint8 private _arbitrationRewardPercentage = 1;
     address private _bodhiTokenAddress;
     address private _eventFactoryAddress;
-    uint256 private _eventEscrowAmount = 100 * (10 ** TOKEN_DECIMALS); // 100 NBOT
-    uint256 private _arbitrationLength = 48 * 60 * 60; // 48 hours
-    uint256 private _startingOracleThreshold = 100 * (10 ** TOKEN_DECIMALS); // 100 NBOT
-    uint256 private _thresholdPercentIncrease = 10;
+    uint private _eventEscrowAmount = 100 * (10 ** TOKEN_DECIMALS); // 100 NBOT
+    uint private _arbitrationLength = 48 * 60 * 60; // 48 hours
+    uint private _startingConsensusThreshold = 100 * (10 ** TOKEN_DECIMALS); // 100 NBOT
+    uint private _thresholdPercentIncrease = 10;
     mapping(address => bool) private _whitelistedContracts;
 
     // Events
@@ -72,7 +72,7 @@ contract ConfigManager is IConfigManager, Ownable {
     /// @dev Sets the escrow amount that is needed to create an Event.
     /// @param newAmount The new escrow amount needed to create an Event.
     function setEventEscrowAmount(
-        uint256 newAmount)
+        uint newAmount)
         external
         onlyOwner
     {
@@ -82,7 +82,7 @@ contract ConfigManager is IConfigManager, Ownable {
     /// @dev Sets the arbitration length.
     /// @param newLength The new length in seconds (unix time) of an arbitration period.
     function setArbitrationLength(
-        uint256 newLength)
+        uint newLength)
         external
         onlyOwner
     {   
@@ -102,22 +102,36 @@ contract ConfigManager is IConfigManager, Ownable {
 
     /// @dev Sets the starting betting threshold.
     /// @param newThreshold The new consensus threshold for the betting round.
-    function setStartingOracleThreshold(
-        uint256 newThreshold)
+    function setStartingConsensusThreshold(
+        uint newThreshold)
         external
         onlyOwner
     {
-        _startingOracleThreshold = newThreshold;
+        _startingConsensusThreshold = newThreshold;
     }
 
     /// @dev Sets the threshold percentage increase.
     /// @param newPercentage The new percentage increase for each new round.
     function setConsensusThresholdPercentIncrease(
-        uint256 newPercentage)
+        uint newPercentage)
         external
         onlyOwner
     {
         _thresholdPercentIncrease = newPercentage;
+    }
+
+    function calculateThreshold(uint length) external view returns (uint) {
+        if (length === _arbitrationLength) { // 48 hours
+            return _startingConsensusThreshold;
+        } else if (length === (_arbitrationLength / 2)) { // 24 hours
+            return _startingConsensusThreshold * 10; // Base * 1000%
+        } else if (length === (_arbitrationLength / 4)) { // 12 hours
+            return _startingConsensusThreshold * 50; // Base * 5000%
+        } else if (length === (_arbitrationLength / 8)) { // 6 hours
+            return _startingConsensusThreshold * 100; // Base * 10000%
+        } else {
+            return 0;
+        }
     }
 
     function bodhiTokenAddress() external view returns (address) {
@@ -128,15 +142,19 @@ contract ConfigManager is IConfigManager, Ownable {
         return _eventFactoryAddress;
     }
 
-    function eventEscrowAmount() external view returns (uint256) {
+    function eventEscrowAmount() external view returns (uint) {
         return _eventEscrowAmount;
     }
 
-    function startingOracleThreshold() external view returns (uint256) {
-        return _startingOracleThreshold;
+    function defaultArbitrationLength() external view returns (uint) {
+        return _arbitrationLength;
     }
 
-    function thresholdPercentIncrease() external view returns (uint256) {
+    function defaultStartingConsensusThreshold() external view returns (uint) {
+        return _startingConsensusThreshold;
+    }
+
+    function thresholdPercentIncrease() external view returns (uint) {
         return _thresholdPercentIncrease;
     }
 
