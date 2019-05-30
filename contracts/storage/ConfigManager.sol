@@ -4,15 +4,24 @@ import "./IConfigManager.sol";
 import "../lib/Ownable.sol";
 
 contract ConfigManager is IConfigManager, Ownable {
-    uint256 private constant TOKEN_DECIMALS = 8;
+    uint private constant TOKEN_DECIMALS = 8;
 
-    uint8 private _arbitrationRewardPercentage = 1;
     address private _bodhiTokenAddress;
     address private _eventFactoryAddress;
-    uint256 private _eventEscrowAmount = 100 * (10 ** TOKEN_DECIMALS);
-    uint256 private _arbitrationLength = 24 * 60 * 60; // 1 day
-    uint256 private _startingOracleThreshold = 100 * (10 ** TOKEN_DECIMALS);
-    uint256 private _thresholdPercentIncrease = 10;
+    uint private _eventEscrowAmount = 100 * (10 ** TOKEN_DECIMALS); // 100 NBOT
+    uint[4] private _arbitrationLength = [
+        172800, // 48 hours
+        86400, // 24 hours
+        43200, // 12 hours
+        21600 // 6 hours
+    ];
+    uint[4] private _startingConsensusThreshold = [
+        100 * (10 ** TOKEN_DECIMALS),
+        1000 * (10 ** TOKEN_DECIMALS),
+        5000 * (10 ** TOKEN_DECIMALS),
+        10000 * (10 ** TOKEN_DECIMALS)
+    ];
+    uint private _thresholdPercentIncrease = 10;
     mapping(address => bool) private _whitelistedContracts;
 
     // Events
@@ -72,7 +81,7 @@ contract ConfigManager is IConfigManager, Ownable {
     /// @dev Sets the escrow amount that is needed to create an Event.
     /// @param newAmount The new escrow amount needed to create an Event.
     function setEventEscrowAmount(
-        uint256 newAmount)
+        uint newAmount)
         external
         onlyOwner
     {
@@ -80,40 +89,35 @@ contract ConfigManager is IConfigManager, Ownable {
     }
 
     /// @dev Sets the arbitration length.
-    /// @param newLength The new length in seconds (unix time) of an arbitration period.
+    /// @param newLength New lengths of arbitration times (unix time seconds).
     function setArbitrationLength(
-        uint256 newLength)
+        uint[4] calldata newLength)
         external
         onlyOwner
     {   
-        require(newLength > 0, "newLength should be > 0");
+        for (uint8 i = 0; i < 4; i++) {
+            require(newLength[i] > 0, "Arbitration time should be > 0");
+        }
         _arbitrationLength = newLength;
-    }
-
-    /// @dev Sets the arbitration reward percentage.
-    /// @param newPercentage New percentage of the arbitration participation reward (e.g. 5)
-    function setArbitrationRewardPercentage(
-        uint8 newPercentage)
-        external
-        onlyOwner
-    {
-        _arbitrationRewardPercentage = newPercentage;
     }
 
     /// @dev Sets the starting betting threshold.
     /// @param newThreshold The new consensus threshold for the betting round.
-    function setStartingOracleThreshold(
-        uint256 newThreshold)
+    function setStartingConsensusThreshold(
+        uint[4] calldata newThreshold)
         external
         onlyOwner
     {
-        _startingOracleThreshold = newThreshold;
+        for (uint8 i = 0; i < 4; i++) {
+            require(newThreshold[i] > 0, "Consensus threshold should be > 0");
+        }
+        _startingConsensusThreshold = newThreshold;
     }
 
     /// @dev Sets the threshold percentage increase.
     /// @param newPercentage The new percentage increase for each new round.
     function setConsensusThresholdPercentIncrease(
-        uint256 newPercentage)
+        uint newPercentage)
         external
         onlyOwner
     {
@@ -128,23 +132,19 @@ contract ConfigManager is IConfigManager, Ownable {
         return _eventFactoryAddress;
     }
 
-    function eventEscrowAmount() external view returns (uint256) {
+    function eventEscrowAmount() external view returns (uint) {
         return _eventEscrowAmount;
     }
 
-    function arbitrationLength() external view returns (uint256) {
+    function arbitrationLength() external view returns (uint[4] memory) {
         return _arbitrationLength;
     }
 
-    function arbitrationRewardPercentage() external view returns (uint8) {
-        return _arbitrationRewardPercentage;
+    function startingConsensusThreshold() external view returns (uint[4] memory) {
+        return _startingConsensusThreshold;
     }
 
-    function startingOracleThreshold() external view returns (uint256) {
-        return _startingOracleThreshold;
-    }
-
-    function thresholdPercentIncrease() external view returns (uint256) {
+    function thresholdPercentIncrease() external view returns (uint) {
         return _thresholdPercentIncrease;
     }
 

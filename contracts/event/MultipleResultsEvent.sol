@@ -26,17 +26,17 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         uint8 resultIndex;
         uint consensusThreshold;
         uint arbitrationEndTime;
-        ResultBalance[11] balances;
+        ResultBalance[4] balances;
     }
 
-    uint16 private constant VERSION = 2;
+    uint16 private constant VERSION = 3;
     uint8 private constant INVALID_RESULT_INDEX = 255;
 
     uint8 private _numOfResults;
     uint8 private _currentRound = 0;
     uint8 private _currentResultIndex = INVALID_RESULT_INDEX;
     string private _eventName;
-    bytes32[11] private _eventResults;
+    bytes32[4] private _eventResults;
     address private _bodhiTokenAddress;
     address private _eventFactoryAddress;
     address private _centralizedOracle;
@@ -49,7 +49,7 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
     uint private _thresholdPercentIncrease;
     uint private _arbitrationRewardPercentage;
     uint private _totalBets;
-    uint[11] private _resultTotals;
+    uint[4] private _resultTotals;
     mapping(uint8 => EventRound) private _eventRounds;
     mapping(address => bool) private _didWithdraw;
 
@@ -109,17 +109,21 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
     /// @param resultSetStartTime Unix time when the CentralizedOracle can set the result.
     /// @param resultSetEndTime Unix time when anyone can set the result.
     /// @param centralizedOracle Address of the user that will decide the result.
+    /// @param arbitrationOptionIndex Index of the selected arbitration option.
+    /// @param arbitrationRewardPercentage Percentage of loser's bets going to winning arbitrators.
     /// @param configManager Address of the ConfigManager.
     constructor(
         address owner,
         string memory eventName,
-        bytes32[11] memory eventResults,
+        bytes32[4] memory eventResults,
         uint8 numOfResults,
         uint betStartTime,
         uint betEndTime,
         uint resultSetStartTime,
         uint resultSetEndTime,
         address centralizedOracle,
+        uint8 arbitrationOptionIndex,
+        uint arbitrationRewardPercentage,
         address configManager)
         Ownable(owner)
         public
@@ -137,6 +141,12 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         require(
             resultSetEndTime > resultSetStartTime,
             "resultSetEndTime should be > resultSetStartTime");
+        require(
+            arbitrationOptionIndex < 4,
+            "arbitrationOptionIndex should be < 4");
+        require(
+            arbitrationRewardPercentage < 100,
+            "arbitrationRewardPercentage should be < 100");
 
         _eventName = eventName;
         _eventResults = eventResults;
@@ -146,6 +156,7 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         _resultSetStartTime = resultSetStartTime;
         _resultSetEndTime = resultSetEndTime;
         _centralizedOracle = centralizedOracle;
+        _arbitrationRewardPercentage = arbitrationRewardPercentage;
 
         // Fetch current config
         IConfigManager config = IConfigManager(configManager);
@@ -154,16 +165,16 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         _eventFactoryAddress = config.eventFactoryAddress();
         assert(_eventFactoryAddress != address(0));
         _escrowAmount = config.eventEscrowAmount();
-        _arbitrationLength = config.arbitrationLength();
-        _arbitrationRewardPercentage = config.arbitrationRewardPercentage();
+        _arbitrationLength = config.arbitrationLength()[arbitrationOptionIndex];
         _thresholdPercentIncrease = config.thresholdPercentIncrease();
 
         // Init CentralizedOracle round
         initEventRound(
             0,
             INVALID_RESULT_INDEX,
-            config.startingOracleThreshold(),
-            0);
+            config.startingConsensusThreshold()[arbitrationOptionIndex],
+            0
+        );
     }
 
     /// @dev Standard NRC223 function that will handle incoming token transfers.
@@ -321,7 +332,7 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
     function eventMetadata()
         public
         view
-        returns (uint16, string memory, bytes32[11] memory, uint8)
+        returns (uint16, string memory, bytes32[4] memory, uint8)
     {
         return (
             VERSION,
@@ -460,7 +471,6 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
             arbitrationEndTime);
 
         // Emit events
-        emit BetPlaced(address(this), from, resultIndex, value, 0);
         emit ResultSet(address(this), from, resultIndex, value, 0,
             nextThreshold, arbitrationEndTime);
     }
