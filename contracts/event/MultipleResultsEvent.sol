@@ -484,7 +484,7 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         _currentResultIndex = resultIndex;
         _currentRound = _currentRound + 1;
 
-        // Clear voting rounds totals
+        // Clear current voting round totals
         _currentVotingRoundTotals = new uint[4]();
 
         // Init next DecentralizedOracle round
