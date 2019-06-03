@@ -31,13 +31,6 @@ const getEventParams = async (cOracle) => {
       web3.utils.fromAscii('A'),
       web3.utils.fromAscii('B'),
       web3.utils.fromAscii('C'),
-      web3.utils.fromAscii(''),
-      web3.utils.fromAscii(''),
-      web3.utils.fromAscii(''),
-      web3.utils.fromAscii(''),
-      web3.utils.fromAscii(''),
-      web3.utils.fromAscii(''),
-      web3.utils.fromAscii(''),
     ],
     `${currTime + 1000}`,
     `${currTime + 3000}`,
@@ -61,7 +54,7 @@ const createEvent = async ({
     // Construct data
     const data = constructTransfer223Data(
       CREATE_EVENT_FUNC_SIG,
-      ['string', 'bytes32[10]', 'uint256', 'uint256', 'uint256', 'uint256', 
+      ['string', 'bytes32[3]', 'uint256', 'uint256', 'uint256', 'uint256', 
         'address', 'uint8', 'uint256'],
       eventParams,
     )
@@ -157,18 +150,17 @@ contract('MultipleResultsEvent', (accounts) => {
     eventMethods = event.contract.methods
   })
 
-  describe.only('constructor', () => {
+  describe('constructor', () => {
     it('initializes all the values', async () => {
       assert.equal(await eventMethods.owner().call(), OWNER)
       
       const eventMeta = await eventMethods.eventMetadata().call()
-      assert.equal(eventMeta[0], 2)
+      assert.equal(eventMeta[0], 4)
       assert.equal(eventMeta[1], 'Test Event 1')
       assert.equal(web3.utils.toUtf8(eventMeta[2][0]), RESULT_INVALID)
       assert.equal(web3.utils.toUtf8(eventMeta[2][1]), 'A')
       assert.equal(web3.utils.toUtf8(eventMeta[2][2]), 'B')
       assert.equal(web3.utils.toUtf8(eventMeta[2][3]), 'C')
-      assert.equal(web3.utils.toUtf8(eventMeta[2][4]), '')
       assert.equal(eventMeta[3], 4)
 
       const centralizedMeta = await eventMethods.centralizedMetadata().call()
@@ -182,16 +174,13 @@ contract('MultipleResultsEvent', (accounts) => {
       assert.equal(configMeta[0], escrowAmt)
       assert.equal(
         configMeta[1],
-        await configManagerMethods.arbitrationLength().call(),
+        (await configManagerMethods.arbitrationLength().call())[0],
       )
       assert.equal(
         configMeta[2],
         await configManagerMethods.thresholdPercentIncrease().call(),
       )
-      assert.equal(
-        configMeta[3],
-        await configManagerMethods.arbitrationRewardPercentage().call(),
-      )
+      assert.equal(configMeta[3], eventParams[8])
     })
 
     it('throws if centralizedOracle address is invalid', async () => {
@@ -236,13 +225,6 @@ contract('MultipleResultsEvent', (accounts) => {
           web3.utils.fromAscii(''),
           web3.utils.fromAscii('B'),
           web3.utils.fromAscii('C'),
-          web3.utils.fromAscii(''),
-          web3.utils.fromAscii(''),
-          web3.utils.fromAscii(''),
-          web3.utils.fromAscii(''),
-          web3.utils.fromAscii(''),
-          web3.utils.fromAscii(''),
-          web3.utils.fromAscii(''),
         ]
         await createEvent({
           nbotMethods,
@@ -261,13 +243,6 @@ contract('MultipleResultsEvent', (accounts) => {
         params[0] = 'Test Event 4'
         params[1] = [
           web3.utils.fromAscii('A'),
-          web3.utils.fromAscii(''),
-          web3.utils.fromAscii(''),
-          web3.utils.fromAscii(''),
-          web3.utils.fromAscii(''),
-          web3.utils.fromAscii(''),
-          web3.utils.fromAscii(''),
-          web3.utils.fromAscii(''),
           web3.utils.fromAscii(''),
           web3.utils.fromAscii(''),
         ]
