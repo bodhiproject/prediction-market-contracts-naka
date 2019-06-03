@@ -244,7 +244,7 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
 
     /// @notice Calculates the tokens returned based on the sender's participation.
     /// @param better Address to calculate winnings for.
-    /// @return Amount of bet and vote tokens won.
+    /// @return Amount of tokens that will be returned.
     function calculateWinnings(
         address better)
         public
@@ -257,56 +257,13 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
             return 0;
         }
 
-        // Calculate bet round losers' total
-        uint betRoundLosersTotal;
-        for (uint8 i = 0; i < _numOfResults; i++) {
-            if (i != _currentResultIndex) {
-                betRoundLosersTotal = 
-                    betRoundLosersTotal.add(_eventRounds[0].balances[i].total);
-            }
+        // Bets are returned if the currentResultIndex is Invalid
+        if (_currentResultIndex == 0) {
+            return calculateInvalidWinnings(better);
         }
 
-        // Subtract arbitration reward from bet round losers' total
-        uint arbitrationReward = 
-            uint(_arbitrationRewardPercentage).mul(betRoundLosersTotal).div(100);
-        betRoundLosersTotal = betRoundLosersTotal.sub(arbitrationReward);
-
-        // Calculate all vote rounds totals
-        uint voteRoundsWinnersTotal;
-        uint voteRoundsLosersTotal;
-        for (uint8 i = 1; i <= _currentRound; i++) {
-            for (uint8 j = 0; j < _numOfResults; j++) {
-                uint total = _eventRounds[i].balances[j].total;
-                if (j == _currentResultIndex) {
-                    voteRoundsWinnersTotal = voteRoundsWinnersTotal.add(total);
-                } else {
-                    voteRoundsLosersTotal = voteRoundsLosersTotal.add(total);
-                }
-            }
-        }
-
-        // Calculate all rounds totals
-        uint allRoundsWinnersTotal = _resultTotals[_currentResultIndex];
-        uint allRoundsLosersTotal = betRoundLosersTotal.add(voteRoundsLosersTotal);
-
-        // Calculate user's winning bets
-        uint allRoundsUserBets;
-        uint voteRoundsUserBets;
-        for (uint8 i = 0; i <= _currentRound; i++) {
-            uint bets = _eventRounds[i].balances[_currentResultIndex].bets[better];
-            allRoundsUserBets = allRoundsUserBets.add(bets);
-            if (i > 0) {
-                voteRoundsUserBets = voteRoundsUserBets.add(bets);
-            }
-        }
-
-        // Calculate users portion of all rounds losers total
-        uint winningAmt = allRoundsUserBets.mul(allRoundsLosersTotal)
-            .div(allRoundsWinnersTotal).add(allRoundsUserBets);
-        uint arbitrationRewardAmt = voteRoundsUserBets.mul(arbitrationReward)
-            .div(voteRoundsWinnersTotal);
-        winningAmt = winningAmt.add(arbitrationRewardAmt);
-        return winningAmt;
+        // Otherwise calculate winnings for a non-Invalid result
+        return calculateNormalWinnings(better);
     }
 
     function version() public pure returns (uint16) {
@@ -561,5 +518,140 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
     {
         uint increment = _thresholdPercentIncrease.mul(currentThreshold).div(100);
         return currentThreshold.add(increment);
+    }
+
+    /// @notice Calculates the tokens returned for a non-Invalid final result.
+    /// @param better Address to calculate winnings for.
+    /// @return Amount of tokens that will be returned.
+    function calculateNormalWinnings(
+        address better)
+        private
+        view
+        returns (uint)
+    {
+        // Calculate user's winning bets
+        uint myWinningBets;
+        uint myWinningVotes;
+        for (uint8 i = 0; i <= _currentRound; i++) {
+            uint bets = _eventRounds[i].balances[_currentResultIndex].bets[better];
+            if (i == 0) {
+                myWinningBets = myWinningBets.add(bets);
+            } else {
+                myWinningVotes = myWinningVotes.add(bets);
+            }
+        }
+
+        // Calculate bet round totals
+        uint betRoundWinnersTotal =
+            _eventRounds[0].balances[_currentResultIndex].total;
+        uint betRoundLosersTotal;
+        for (uint8 i = 0; i < _numOfResults; i++) {
+            if (i != _currentResultIndex) {
+                betRoundLosersTotal = 
+                    betRoundLosersTotal.add(_eventRounds[0].balances[i].total);
+            }
+        }
+
+        // Calculate user's winning amount for bet round
+        uint maxPercent = 100;
+        uint betRoundWinningAmt;
+        if (myWinningBets > 0 && betRoundWinnersTotal > 0) {
+            uint percentage = maxPercent.sub(_arbitrationRewardPercentage);
+            betRoundWinningAmt =
+                betRoundLosersTotal
+                .mul(percentage)
+                .div(maxPercent)
+                .mul(myWinningBets)
+                .div(betRoundWinnersTotal);
+        }
+
+        // Calculate all vote rounds totals
+        uint voteRoundsWinnersTotal;
+        uint voteRoundsLosersTotal;
+        for (uint8 i = 1; i <= _currentRound; i++) {
+            for (uint8 j = 0; j < _numOfResults; j++) {
+                uint total = _eventRounds[i].balances[j].total;
+                if (j == _currentResultIndex) {
+                    voteRoundsWinnersTotal = voteRoundsWinnersTotal.add(total);
+                } else {
+                    voteRoundsLosersTotal = voteRoundsLosersTotal.add(total);
+                }
+            }
+        }
+
+        // Calculate user's winning amount for vote rounds
+        uint voteRoundsWinningAmt;
+        if (myWinningVotes > 0 && voteRoundsWinnersTotal > 0) {
+            voteRoundsWinningAmt =
+                betRoundLosersTotal
+                .mul(_arbitrationRewardPercentage)
+                .div(maxPercent)
+                .add(voteRoundsLosersTotal)
+                .mul(myWinningVotes)
+                .div(voteRoundsWinnersTotal);
+        }
+
+        return myWinningBets
+            .add(myWinningVotes)
+            .add(betRoundWinningAmt)
+            .add(voteRoundsWinningAmt);
+    }
+
+    /// @notice Calculates the tokens returned for an Invalid final result.
+    /// @param better Address to calculate winnings for.
+    /// @return Amount of tokens that will be returned.
+    function calculateInvalidWinnings(
+        address better)
+        private
+        view
+        returns (uint)
+    {
+        // Calculate user's winning bets
+        uint myWinningBets;
+        uint myWinningVotes;
+        for (uint8 i = 0; i <= _currentRound; i++) {
+            uint bets = _eventRounds[i].balances[_currentResultIndex].bets[better];
+            if (i == 0) {
+                myWinningBets = myWinningBets.add(bets);
+            } else {
+                myWinningVotes = myWinningVotes.add(bets);
+            }
+        }
+
+        // Calculate user's losing bets
+        uint myLosingBets;
+        for (uint8 i = 0; i < _numOfResults; i++) {
+            if (i != _currentResultIndex) {
+                myLosingBets = myLosingBets.add(_eventRounds[0].balances[i].bets[better]);
+            }
+        }
+
+        // Calculate all vote rounds totals
+        uint voteRoundsWinnersTotal;
+        uint voteRoundsLosersTotal;
+        for (uint8 i = 1; i <= _currentRound; i++) {
+            for (uint8 j = 0; j < _numOfResults; j++) {
+                uint total = _eventRounds[i].balances[j].total;
+                if (j == _currentResultIndex) {
+                    voteRoundsWinnersTotal = voteRoundsWinnersTotal.add(total);
+                } else {
+                    voteRoundsLosersTotal = voteRoundsLosersTotal.add(total);
+                }
+            }
+        }
+
+        // Calculate user's winning amount for vote rounds
+        uint voteRoundsWinningAmt;
+        if (myWinningVotes > 0 && voteRoundsWinnersTotal > 0) {
+            voteRoundsWinningAmt =
+                voteRoundsLosersTotal
+                .mul(myWinningVotes)
+                .div(voteRoundsWinnersTotal);
+        }
+
+        return myWinningBets
+            .add(myLosingBets)
+            .add(myWinningVotes)
+            .add(voteRoundsWinningAmt);
     }
 }
