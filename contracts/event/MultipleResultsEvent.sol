@@ -541,29 +541,27 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
 
         // Calculate user's winning amount for bet round
         uint maxPercent = 100;
-        uint betRoundWinnersTotal = _betRoundTotals[_currentResultIndex];
         uint betRoundWinningAmt;
-        if (myWinningBets > 0 && betRoundWinnersTotal > 0) {
+        if (myWinningBets > 0 && _betRoundTotals[_currentResultIndex] > 0) {
             uint percentage = maxPercent.sub(_arbitrationRewardPercentage);
             betRoundWinningAmt =
                 betRoundLosersTotal
                 .mul(percentage)
                 .div(maxPercent)
                 .mul(myWinningBets)
-                .div(betRoundWinnersTotal);
+                .div(_betRoundTotals[_currentResultIndex]);
         }
 
         // Calculate user's winning amount for vote rounds
-        uint voteRoundsWinnersTotal = _voteRoundsTotals[_currentResultIndex];
         uint voteRoundsWinningAmt;
-        if (myWinningVotes > 0 && voteRoundsWinnersTotal > 0) {
+        if (myWinningVotes > 0 && _voteRoundsTotals[_currentResultIndex] > 0) {
             voteRoundsWinningAmt =
                 betRoundLosersTotal
                 .mul(_arbitrationRewardPercentage)
                 .div(maxPercent)
                 .add(voteRoundsLosersTotal)
                 .mul(myWinningVotes)
-                .div(voteRoundsWinnersTotal);
+                .div(_voteRoundsTotals[_currentResultIndex]);
         }
 
         return myWinningBets
@@ -597,13 +595,12 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         }
 
         // Calculate user's winning amount for vote rounds
-        uint voteRoundsWinnersTotal = _voteRoundsTotals[_currentResultIndex];
         uint voteRoundsWinningAmt;
-        if (myWinningVotes > 0 && voteRoundsWinnersTotal > 0) {
+        if (myWinningVotes > 0 && _voteRoundsTotals[_currentResultIndex] > 0) {
             voteRoundsWinningAmt =
                 voteRoundsLosersTotal
                 .mul(myWinningVotes)
-                .div(voteRoundsWinnersTotal);
+                .div(_voteRoundsTotals[_currentResultIndex]);
         }
 
         return myWinningBets
