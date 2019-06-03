@@ -457,8 +457,8 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         emit VotePlaced(address(this), from, resultIndex, value, _currentRound);
 
         // If voted over the threshold, create a new DecentralizedOracle round
-        uint threshold = _eventRounds[_currentRound].consensusThreshold;
-        if (_currentVotingRoundTotals[resultIndex] >= threshold) {
+        if (_currentVotingRoundTotals[resultIndex] >=
+            _eventRounds[_currentRound].consensusThreshold) {
             voteSetResult(from, resultIndex, value);
         }
     }
@@ -474,10 +474,9 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         private
     {
         // Refund difference over threshold
-        if (_currentVotingRoundTotals[resultIndex].add(value) >
+        if (_currentVotingRoundTotals[resultIndex] >
             _eventRounds[_currentRound].consensusThreshold) {
             uint diff = _currentVotingRoundTotals[resultIndex]
-                .add(value)
                 .sub(_eventRounds[_currentRound].consensusThreshold));
             INRC223(_bodhiTokenAddress).transfer(from, diff);
         }
