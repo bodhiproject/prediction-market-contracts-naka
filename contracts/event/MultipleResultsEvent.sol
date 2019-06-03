@@ -525,30 +525,23 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         returns (uint)
     {
         // Calculate user's winning bets
-        uint myWinningBets;
-        uint myWinningVotes;
-        for (uint8 i = 0; i <= _currentRound; i++) {
-            uint bets = _eventRounds[i].balances[_currentResultIndex].bets[better];
-            if (i == 0) {
-                myWinningBets = myWinningBets.add(bets);
-            } else {
-                myWinningVotes = myWinningVotes.add(bets);
-            }
-        }
+        uint myWinningBets = _betRoundUserTotals[better][_currentResultIndex];
+        uint myWinningVotes = _voteRoundsUserTotals[better][_currentResultIndex];
 
-        // Calculate bet round totals
-        uint betRoundWinnersTotal =
-            _eventRounds[0].balances[_currentResultIndex].total;
+        // Calculate bet and vote rounds losing totals
         uint betRoundLosersTotal;
+        uint voteRoundsLosersTotal;
         for (uint8 i = 0; i < _numOfResults; i++) {
             if (i != _currentResultIndex) {
-                betRoundLosersTotal = 
-                    betRoundLosersTotal.add(_eventRounds[0].balances[i].total);
+                betRoundLosersTotal = betRoundLosersTotal.add(_betRoundTotals[i]);
+                voteRoundsLosersTotal =
+                    voteRoundsLosersTotal.add(_voteRoundsTotals[i]);
             }
         }
 
         // Calculate user's winning amount for bet round
         uint maxPercent = 100;
+        uint betRoundWinnersTotal = _betRoundTotals[_currentResultIndex];
         uint betRoundWinningAmt;
         if (myWinningBets > 0 && betRoundWinnersTotal > 0) {
             uint percentage = maxPercent.sub(_arbitrationRewardPercentage);
@@ -560,21 +553,8 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
                 .div(betRoundWinnersTotal);
         }
 
-        // Calculate all vote rounds totals
-        uint voteRoundsWinnersTotal;
-        uint voteRoundsLosersTotal;
-        for (uint8 i = 1; i <= _currentRound; i++) {
-            for (uint8 j = 0; j < _numOfResults; j++) {
-                uint total = _eventRounds[i].balances[j].total;
-                if (j == _currentResultIndex) {
-                    voteRoundsWinnersTotal = voteRoundsWinnersTotal.add(total);
-                } else {
-                    voteRoundsLosersTotal = voteRoundsLosersTotal.add(total);
-                }
-            }
-        }
-
         // Calculate user's winning amount for vote rounds
+        uint voteRoundsWinnersTotal = _voteRoundsTotals[_currentResultIndex];
         uint voteRoundsWinningAmt;
         if (myWinningVotes > 0 && voteRoundsWinnersTotal > 0) {
             voteRoundsWinningAmt =
@@ -602,40 +582,22 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         returns (uint)
     {
         // Calculate user's winning bets
-        uint myWinningBets;
-        uint myWinningVotes;
-        for (uint8 i = 0; i <= _currentRound; i++) {
-            uint bets = _eventRounds[i].balances[_currentResultIndex].bets[better];
-            if (i == 0) {
-                myWinningBets = myWinningBets.add(bets);
-            } else {
-                myWinningVotes = myWinningVotes.add(bets);
-            }
-        }
+        uint myWinningBets = _betRoundUserTotals[better][_currentResultIndex];
+        uint myWinningVotes = _voteRoundsUserTotals[better][_currentResultIndex];
 
-        // Calculate user's losing bets
+        // Calculate user's losing bets and vote rounds losing totals
         uint myLosingBets;
+        uint voteRoundsLosersTotal;
         for (uint8 i = 0; i < _numOfResults; i++) {
             if (i != _currentResultIndex) {
-                myLosingBets = myLosingBets.add(_eventRounds[0].balances[i].bets[better]);
-            }
-        }
-
-        // Calculate all vote rounds totals
-        uint voteRoundsWinnersTotal;
-        uint voteRoundsLosersTotal;
-        for (uint8 i = 1; i <= _currentRound; i++) {
-            for (uint8 j = 0; j < _numOfResults; j++) {
-                uint total = _eventRounds[i].balances[j].total;
-                if (j == _currentResultIndex) {
-                    voteRoundsWinnersTotal = voteRoundsWinnersTotal.add(total);
-                } else {
-                    voteRoundsLosersTotal = voteRoundsLosersTotal.add(total);
-                }
+                myLosingBets = myLosingBets.add(_betRoundUserTotals[better][i]);
+                voteRoundsLosersTotal =
+                    voteRoundsLosersTotal.add(_voteRoundsTotals[i]);
             }
         }
 
         // Calculate user's winning amount for vote rounds
+        uint voteRoundsWinnersTotal = _voteRoundsTotals[_currentResultIndex];
         uint voteRoundsWinningAmt;
         if (myWinningVotes > 0 && voteRoundsWinnersTotal > 0) {
             voteRoundsWinningAmt =
