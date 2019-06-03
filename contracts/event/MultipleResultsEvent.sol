@@ -240,10 +240,10 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
     }
 
     /// @notice Calculates the tokens returned based on the sender's participation.
-    /// @param better Address to calculate winnings for.
+    /// @param player Address to calculate winnings for.
     /// @return Amount of tokens that will be returned.
     function calculateWinnings(
-        address better)
+        address player)
         public
         view
         returns (uint)
@@ -256,11 +256,11 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
 
         // Bets are returned if the currentResultIndex is Invalid
         if (_currentResultIndex == 0) {
-            return calculateInvalidWinnings(better);
+            return calculateInvalidWinnings(player);
         }
 
         // Otherwise calculate winnings for a non-Invalid result
-        return calculateNormalWinnings(better);
+        return calculateNormalWinnings(player);
     }
 
     function version() public pure returns (uint16) {
@@ -516,17 +516,17 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
     }
 
     /// @notice Calculates the tokens returned for a non-Invalid final result.
-    /// @param better Address to calculate winnings for.
+    /// @param player Address to calculate winnings for.
     /// @return Amount of tokens that will be returned.
     function calculateNormalWinnings(
-        address better)
+        address player)
         private
         view
         returns (uint)
     {
         // Calculate user's winning bets
-        uint myWinningBets = _betRoundUserTotals[better][_currentResultIndex];
-        uint myWinningVotes = _voteRoundsUserTotals[better][_currentResultIndex];
+        uint myWinningBets = _betRoundUserTotals[player][_currentResultIndex];
+        uint myWinningVotes = _voteRoundsUserTotals[player][_currentResultIndex];
 
         // Calculate bet and vote rounds losing totals
         uint betRoundLosersTotal;
@@ -571,24 +571,24 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
     }
 
     /// @notice Calculates the tokens returned for an Invalid final result.
-    /// @param better Address to calculate winnings for.
+    /// @param player Address to calculate winnings for.
     /// @return Amount of tokens that will be returned.
     function calculateInvalidWinnings(
-        address better)
+        address player)
         private
         view
         returns (uint)
     {
         // Calculate user's winning bets
-        uint myWinningBets = _betRoundUserTotals[better][_currentResultIndex];
-        uint myWinningVotes = _voteRoundsUserTotals[better][_currentResultIndex];
+        uint myWinningBets = _betRoundUserTotals[player][_currentResultIndex];
+        uint myWinningVotes = _voteRoundsUserTotals[player][_currentResultIndex];
 
         // Calculate user's losing bets and vote rounds losing totals
         uint myLosingBets;
         uint voteRoundsLosersTotal;
         for (uint8 i = 0; i < _numOfResults; i++) {
             if (i != _currentResultIndex) {
-                myLosingBets = myLosingBets.add(_betRoundUserTotals[better][i]);
+                myLosingBets = myLosingBets.add(_betRoundUserTotals[player][i]);
                 voteRoundsLosersTotal =
                     voteRoundsLosersTotal.add(_voteRoundsTotals[i]);
             }

@@ -44,6 +44,8 @@ const getEventParams = async (cOracle) => {
     `${currTime + 4000}`,
     `${currTime + 6000}`,
     cOracle,
+    0,
+    10,
   ]
 }
 
@@ -59,7 +61,8 @@ const createEvent = async ({
     // Construct data
     const data = constructTransfer223Data(
       CREATE_EVENT_FUNC_SIG,
-      ['string', 'bytes32[10]', 'uint256', 'uint256', 'uint256', 'uint256', 'address'],
+      ['string', 'bytes32[10]', 'uint256', 'uint256', 'uint256', 'uint256', 
+        'address', 'uint8', 'uint256'],
       eventParams,
     )
 
@@ -154,7 +157,7 @@ contract('MultipleResultsEvent', (accounts) => {
     eventMethods = event.contract.methods
   })
 
-  describe('constructor', () => {
+  describe.only('constructor', () => {
     it('initializes all the values', async () => {
       assert.equal(await eventMethods.owner().call(), OWNER)
       
@@ -411,7 +414,7 @@ contract('MultipleResultsEvent', (accounts) => {
   //     })
   //   })
 
-  describe.only('bet()', () => {
+  describe('bet()', () => {
     beforeEach(async () => {
       const currTime = await currentBlockTime()
       await timeMachine.increaseTime(Number(eventParams[2]) - currTime)
