@@ -49,7 +49,10 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
     uint private _thresholdPercentIncrease;
     uint private _arbitrationRewardPercentage;
     uint private _totalBets;
-    uint[4] private _resultTotals;
+    uint[4] private _betRoundTotals;
+    uint[4] private _voteRoundsTotals;
+    mapping(address => uint[4]) private _betRoundUserTotals;
+    mapping(address => uint[4]) private _voteRoundsUserTotals;
     mapping(uint8 => EventRound) private _eventRounds;
     mapping(address => bool) private _didWithdraw;
 
