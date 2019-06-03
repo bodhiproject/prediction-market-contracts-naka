@@ -185,7 +185,7 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         external
     {
         require(msg.sender == _bodhiTokenAddress, "Only NBOT is accepted");
-        require(data.length >= 4, "Data is not long enough.");
+        require(data.length >= 4, "Data is not long enough");
 
         bytes memory betFunc = hex"885ab66d";
         bytes memory setResultFunc = hex"a6b4218b";

@@ -348,82 +348,33 @@ contract('MultipleResultsEvent', (accounts) => {
     })
   })
 
-  // describe('tokenFallback()', () => {
-  //   describe('setResult()', () => {
-  //     let threshold
+  describe('tokenFallback()', () => {
+    it('throws if data is not long enough', async () => {
+      try {
+        await nbotMethods['transfer(address,uint256,bytes)'](
+          eventAddr,
+          1,
+          web3.utils.hexToBytes('0xaabbcc'),
+        ).send({ from: OWNER, gas: 200000 })
+      } catch (e) {
+        sassert.revert(e, 'Data is not long enough')
+      }
+    })
 
-  //     beforeEach(async () => {
-  //       threshold = await cOracle.consensusThreshold.call()
+    it('throws if function sig is unhandled', async () => {
+      try {
+        await nbotMethods['transfer(address,uint256,bytes)'](
+          eventAddr,
+          1,
+          web3.utils.hexToBytes('0xaabbccdd0000000000000000000000000000000000000000000000000000000000000001'),
+        ).send({ from: OWNER, gas: 200000 })
+      } catch (e) {
+        sassert.revert(e, 'Unhandled function in tokenFallback')
+      }
+    })
+  })
 
-  //       // Advance to result setting start time
-  //       await timeMachine.increaseTime(eventParams._resultSettingStartTime - currentBlockTime())
-  //       assert.isAtLeast(currentBlockTime(), eventParams._resultSettingStartTime)
-  //       assert.isBelow(currentBlockTime(), eventParams._resultSettingEndTime)
-  //     })
-
-  //     it('calls setResult() correctly', async () => {
-  //       // Call ERC223 transfer method
-  //       const resultIndex = 3
-  //       const tx = await ContractHelper.transferSetResult(token, event, cOracle, OWNER, resultIndex, threshold, OWNER)
-        
-  //       // Validate event
-  //       assert.equal(await event.status.call(), EventStatus.ORACLE_VOTING)
-  //       assert.equal(await event.resultIndex.call(), resultIndex)
-  //       SolAssert.assertBNEqual((await event.getTotalVotes())[resultIndex], threshold)
-  //       SolAssert.assertBNEqual((await event.getVoteBalances({ from: OWNER }))[resultIndex], threshold)
-  //       SolAssert.assertBNEqual(await event.totalArbitrationTokens.call(), threshold)
-
-  //       // Validate cOracle
-  //       assert.isTrue(await cOracle.finished.call())
-  //       assert.equal(await cOracle.resultIndex.call(), resultIndex)
-  //       SolAssert.assertBNEqual((await cOracle.getTotalVotes())[resultIndex], threshold)
-  //       SolAssert.assertBNEqual((await cOracle.getVoteBalances({ from: OWNER }))[resultIndex], threshold)
-
-  //       // Validate dOracle created
-  //       const dOracleAddress = paddedHexToAddress(tx.events['2'].raw.topics[2])
-  //       dOracle = await DecentralizedOracle.at(dOracleAddress)
-  //       assert.equal(await dOracle.eventAddress.call(), event.address)
-  //       assert.equal(await dOracle.lastResultIndex.call(), resultIndex)
-  //       SolAssert.assertBNEqual(await dOracle.consensusThreshold.call(),
-  //         percentIncrease(threshold, thresholdIncrease))
-  //     })
-
-  //     it('throws if the data length is not 76 bytes', async () => {
-  //       const resultIndex = 3
-  //       let data = '0x65f4ced1'
-  //         + Qweb3Utils.trimHexPrefix(cOracle.address)
-  //         + Qweb3Utils.trimHexPrefix(OWNER)
-  //         + Encoder.uintToHex(resultIndex)
-  //       assert.equal(data.length, 154)
-  //       data = data.slice(0, 152)
-  //       assert.equal(data.length, 152)
-
-  //       try {
-  //         await tokenWeb3Contract.methods["transfer(address,uint256,bytes)"](event.address, threshold, data)
-  //           .send({ from: OWNER, gas: 5000000 })
-  //         assert.fail()
-  //       } catch (e) {
-  //         SolAssert.assertRevert(e)
-  //       }
-  //     })
-
-  //     it('throws if the event status is not betting', async () => {
-  //       // Call ERC223 transfer method
-  //       let resultIndex = 3
-  //       await ContractHelper.transferSetResult(token, event, cOracle, OWNER, resultIndex, threshold, OWNER)
-  //       assert.equal(await event.status.call(), EventStatus.ORACLE_VOTING)
-
-  //       // Try to set the result again
-  //       try {
-  //         await ContractHelper.transferSetResult(token, event, cOracle, OWNER, resultIndex, threshold, OWNER)
-  //         assert.fail()
-  //       } catch (e) {
-  //         SolAssert.assertRevert(e)
-  //       }
-  //     })
-  //   })
-
-  describe.only('bet()', () => {
+  describe('bet()', () => {
     describe('valid bet time', () => {
       beforeEach(async () => {
         await fundUsers({ nbotMethods, accounts })
