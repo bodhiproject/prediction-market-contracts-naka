@@ -13,12 +13,6 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
     using ByteUtils for bytes32;
     using SafeMath for uint;
 
-    /// @dev Represents all the bets of a result.
-    struct ResultBalance {
-        uint total;
-        mapping(address => uint) bets;
-    }
-
     /// @dev Represents the aggregated bets/votes of a round.
     struct EventRound {
         bool finished;
@@ -26,7 +20,6 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         uint8 resultIndex;
         uint consensusThreshold;
         uint arbitrationEndTime;
-        ResultBalance[4] balances;
     }
 
     uint16 private constant VERSION = 4;
