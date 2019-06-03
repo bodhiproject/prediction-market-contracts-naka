@@ -18,10 +18,21 @@ const MultipleResultsEvent = artifacts.require('MultipleResultsEvent')
 
 const web3 = global.web3
 
-const CREATE_EVENT_FUNC_SIG = '2b2601bf'
+const CREATE_EVENT_FUNC_SIG = '662edd20'
 const BET_FUNC_SIG = '885ab66d'
 const RESULT_INVALID = 'Invalid'
-const BET_TOKEN_DECIMALS = 8
+const TOKEN_DECIMALS = 8
+
+const fundUsers = async ({ nbotMethods, accounts }) => {
+  await nbotMethods.transfer(accounts[1], toDenomination(10000, TOKEN_DECIMALS))
+    .send({ from: accounts[0] })
+  await nbotMethods.transfer(accounts[2], toDenomination(10000, TOKEN_DECIMALS))
+    .send({ from: accounts[0] })
+  await nbotMethods.transfer(accounts[3], toDenomination(10000, TOKEN_DECIMALS))
+    .send({ from: accounts[0] })
+  await nbotMethods.transfer(accounts[4], toDenomination(10000, TOKEN_DECIMALS))
+    .send({ from: accounts[0] })
+}
 
 const getEventParams = async (cOracle) => {
   const currTime = await currentBlockTime()
@@ -42,14 +53,9 @@ const getEventParams = async (cOracle) => {
   ]
 }
 
-const createEvent = async ({
-  nbotMethods,
-  eventParams,
-  eventFactoryAddr,
-  escrowAmt,
-  from,
-  gas,
-}) => {
+const createEvent = async (
+  { nbotMethods, eventParams, eventFactoryAddr, escrowAmt, from, gas }
+) => {
   try {
     // Construct data
     const data = constructTransfer223Data(
@@ -78,6 +84,18 @@ const createEvent = async ({
   } catch (err) {
     throw err
   }
+}
+
+const placeBet = async (
+  { nbotMethods, eventAddr, amtDecimals, resultIndex, from }
+) => {
+  const amt = toDenomination(amtDecimals, TOKEN_DECIMALS)
+  const data = constructTransfer223Data(BET_FUNC_SIG, ['uint8'], [resultIndex])
+  await nbotMethods['transfer(address,uint256,bytes)'](
+    eventAddr,
+    amt,
+    web3.utils.hexToBytes(data),
+  ).send({ from, gas: 200000 })
 }
 
 contract('MultipleResultsEvent', (accounts) => {
@@ -389,8 +407,10 @@ contract('MultipleResultsEvent', (accounts) => {
   //     })
   //   })
 
-  describe('bet()', () => {
+  describe.only('bet()', () => {
     beforeEach(async () => {
+      await fundUsers({ nbotMethods, accounts })
+
       const currTime = await currentBlockTime()
       await timeMachine.increaseTime(Number(eventParams[2]) - currTime)
       assert.isAtLeast(await currentBlockTime(), Number(eventParams[2]))
@@ -398,15 +418,29 @@ contract('MultipleResultsEvent', (accounts) => {
     })
 
     it('allows users to bet', async () => {
-      const amt = toDenomination(1, BET_TOKEN_DECIMALS)
-      const resultIndex = 0
-      const data = constructTransfer223Data(BET_FUNC_SIG, ['uint8'], [resultIndex])
-      await nbotMethods['transfer(address,uint256,bytes)'](
+      const bet1Amt = 1;
+      await placeBet({
+        nbotMethods,
         eventAddr,
-        amt,
-        web3.utils.hexToBytes(data),
-      ).send({ from: OWNER, gas: 200000 })
-      assert.equal(await eventMethods.totalBets().call(), amt)
+        amtDecimals: bet1Amt,
+        resultIndex: 0,
+        from: OWNER,
+      })
+      assert.equal(
+        await eventMethods.totalBets().call(),
+        toDenomination(bet1Amt, TOKEN_DECIMALS))
+
+      const bet2Amt = 1;
+      await placeBet({
+        nbotMethods,
+        eventAddr,
+        amtDecimals: bet2Amt,
+        resultIndex: 1,
+        from: ACCT1,
+      })
+      assert.equal(
+        await eventMethods.totalBets().call(),
+        toDenomination(bet1Amt + bet2Amt, TOKEN_DECIMALS))
     })
   })
 
@@ -892,22 +926,22 @@ contract('MultipleResultsEvent', (accounts) => {
   //     assert.isBelow(currentBlockTime(), eventParams._bettingEndTime)
 
   //     // First round of betting
-  //     bet1 = toDenomination(12.3456789, BET_TOKEN_DECIMALS)
+  //     bet1 = toDenomination(12.3456789, TOKEN_DECIMALS)
   //     await event.bet(cOracle.address, 0, { from: ACCT1, value: bet1 })
   //     totalBets = bet1
   //     SolAssert.assertBNEqual(toDenomination(await web3.eth.getBalance(event.address)), totalBets)
 
-  //     bet2 = toDenomination(23.45678901, BET_TOKEN_DECIMALS)
+  //     bet2 = toDenomination(23.45678901, TOKEN_DECIMALS)
   //     await event.bet(cOracle.address, 1, { from: ACCT2, value: bet2 })
   //     totalBets = bet1.add(bet2)
   //     SolAssert.assertBNEqual(toDenomination(await web3.eth.getBalance(event.address)), totalBets)
 
-  //     bet3 = toDenomination(30.47682524, BET_TOKEN_DECIMALS)
+  //     bet3 = toDenomination(30.47682524, TOKEN_DECIMALS)
   //     await event.bet(cOracle.address, cOracleResult, { from: ACCT3, value: bet3 })
   //     totalBets = bet1.add(bet2).add(bet3)
   //     SolAssert.assertBNEqual(toDenomination(await web3.eth.getBalance(event.address)), totalBets)
 
-  //     bet4 = toDenomination(12.18956777, BET_TOKEN_DECIMALS)
+  //     bet4 = toDenomination(12.18956777, TOKEN_DECIMALS)
   //     await event.bet(cOracle.address, cOracleResult, { from: ACCT4, value: bet4 })
   //     totalBets = bet1.add(bet2).add(bet3).add(bet4)
   //     SolAssert.assertBNEqual(toDenomination(await web3.eth.getBalance(event.address)), totalBets)
