@@ -473,12 +473,12 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         uint value)
         private
     {
-        // Refund difference over threshold
+        // Calculate diff to refund if over threshold   
+        uint diff;
         if (_currentVotingRoundTotals[resultIndex] >
             _eventRounds[_currentRound].consensusThreshold) {
-            uint diff = _currentVotingRoundTotals[resultIndex]
-                .sub(_eventRounds[_currentRound].consensusThreshold));
-            INRC223(_bodhiTokenAddress).transfer(from, diff);
+            diff = _currentVotingRoundTotals[resultIndex]
+                .sub(_eventRounds[_currentRound].consensusThreshold);
         }
 
         // Calculate next consensus threshold
@@ -502,6 +502,11 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
             resultIndex,
             nextThreshold,
             arbitrationEndTime);
+
+        // Refund difference over threshold
+        if (diff > 0) {
+            INRC223(_bodhiTokenAddress).transfer(from, diff);
+        }
 
         // Emit events
         emit VoteResultSet(address(this), from, resultIndex, value, 
