@@ -20,6 +20,7 @@ const web3 = global.web3
 
 const CREATE_EVENT_FUNC_SIG = '662edd20'
 const BET_FUNC_SIG = '885ab66d'
+const SET_RESULT_FUNC_SIG = 'a6b4218b'
 const RESULT_INVALID = 'Invalid'
 const TOKEN_DECIMALS = 8
 
@@ -96,6 +97,21 @@ const placeBet = async (
     amt,
     web3.utils.hexToBytes(data),
   ).send({ from, gas: 200000 })
+}
+
+const setResult = async (
+  { nbotMethods, eventAddr, amt, resultIndex, from }
+) => {
+  const data = constructTransfer223Data(
+    SET_RESULT_FUNC_SIG,
+    ['uint8'],
+    [resultIndex]
+  )
+  await nbotMethods['transfer(address,uint256,bytes)'](
+    eventAddr,
+    amt,
+    web3.utils.hexToBytes(data),
+  ).send({ from, gas: 400000 })
 }
 
 contract('MultipleResultsEvent', (accounts) => {
@@ -408,39 +424,137 @@ contract('MultipleResultsEvent', (accounts) => {
   //   })
 
   describe.only('bet()', () => {
-    beforeEach(async () => {
-      await fundUsers({ nbotMethods, accounts })
+    describe('valid bet time', () => {
+      beforeEach(async () => {
+        await fundUsers({ nbotMethods, accounts })
+  
+        const currTime = await currentBlockTime()
+        await timeMachine.increaseTime(Number(eventParams[2]) - currTime)
+        assert.isAtLeast(await currentBlockTime(), Number(eventParams[2]))
+        assert.isBelow(await currentBlockTime(), Number(eventParams[3]))
+      })
 
-      const currTime = await currentBlockTime()
-      await timeMachine.increaseTime(Number(eventParams[2]) - currTime)
-      assert.isAtLeast(await currentBlockTime(), Number(eventParams[2]))
-      assert.isBelow(await currentBlockTime(), Number(eventParams[3]))
+      it('allows users to bet', async () => {
+        const bet1Amt = 1;
+        await placeBet({
+          nbotMethods,
+          eventAddr,
+          amtDecimals: bet1Amt,
+          resultIndex: 0,
+          from: OWNER,
+        })
+        assert.equal(
+          await eventMethods.totalBets().call(),
+          toDenomination(bet1Amt, TOKEN_DECIMALS))
+  
+        const bet2Amt = 1;
+        await placeBet({
+          nbotMethods,
+          eventAddr,
+          amtDecimals: bet2Amt,
+          resultIndex: 1,
+          from: ACCT1,
+        })
+        assert.equal(
+          await eventMethods.totalBets().call(),
+          toDenomination(bet1Amt + bet2Amt, TOKEN_DECIMALS))
+      })
+  
+      it('throws if the currentRound is not 0', async () => {
+        const currTime = await currentBlockTime()
+        await timeMachine.increaseTime(Number(eventParams[4]) - currTime)
+        assert.isAtLeast(await currentBlockTime(), Number(eventParams[4]))
+
+        const amt = await eventMethods.currentConsensusThreshold().call()
+        await setResult({
+          nbotMethods,
+          eventAddr,
+          amt,
+          resultIndex: 1,
+          from: OWNER,
+        })
+        assert.equal(await eventMethods.currentRound().call(), 1)
+
+        try {
+          await placeBet({
+            nbotMethods,
+            eventAddr,
+            amtDecimals: 1,
+            resultIndex: 2,
+            from: OWNER,
+          })
+        } catch (e) {
+          sassert.revert(e, 'Can only bet during the betting round')
+        }
+      })
+
+      it('throws if the resultIndex is invalid', async () => {
+        try {
+          await placeBet({
+            nbotMethods,
+            eventAddr,
+            amtDecimals: 1,
+            resultIndex: 4,
+            from: OWNER,
+          })
+        } catch (e) {
+          sassert.revert(e, 'resultIndex is not valid')
+        }
+      })
+
+      it('throws if the bet amount is 0', async () => {
+        try {
+          await placeBet({
+            nbotMethods,
+            eventAddr,
+            amtDecimals: 0,
+            resultIndex: 0,
+            from: OWNER,
+          })
+        } catch (e) {
+          sassert.revert(e, 'Bet amount should be > 0')
+        }
+      })
     })
 
-    it('allows users to bet', async () => {
-      const bet1Amt = 1;
-      await placeBet({
-        nbotMethods,
-        eventAddr,
-        amtDecimals: bet1Amt,
-        resultIndex: 0,
-        from: OWNER,
+    describe('invalid bet time', () => {
+      beforeEach(async () => {
+        await fundUsers({ nbotMethods, accounts })
       })
-      assert.equal(
-        await eventMethods.totalBets().call(),
-        toDenomination(bet1Amt, TOKEN_DECIMALS))
 
-      const bet2Amt = 1;
-      await placeBet({
-        nbotMethods,
-        eventAddr,
-        amtDecimals: bet2Amt,
-        resultIndex: 1,
-        from: ACCT1,
+      it('throws if the current time is < betStartTime', async () => {
+        assert.isBelow(await currentBlockTime(), Number(eventParams[2]))
+
+        try {
+          await placeBet({
+            nbotMethods,
+            eventAddr,
+            amtDecimals: 1,
+            resultIndex: 0,
+            from: OWNER,
+          })
+        } catch (e) {
+          sassert.revert(e, 'Current time should be >= betStartTime')
+        }
       })
-      assert.equal(
-        await eventMethods.totalBets().call(),
-        toDenomination(bet1Amt + bet2Amt, TOKEN_DECIMALS))
+
+      it('throws if the current time is > betEndTime', async () => {
+        const currTime = await currentBlockTime()
+        await timeMachine.increaseTime(Number(eventParams[3]) - currTime)
+        assert.isAtLeast(await currentBlockTime(), Number(eventParams[3]))
+
+        try {
+          await placeBet({
+            nbotMethods,
+            eventAddr,
+            amtDecimals: 1,
+            resultIndex: 0,
+            from: OWNER,
+          })
+        } catch (e) {
+          sassert.revert(e, 'Current time should be < betEndTime.')
+        }
+      })
     })
   })
 
