@@ -51,6 +51,7 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
     uint private _totalBets;
     uint[4] private _betRoundTotals;
     uint[4] private _voteRoundsTotals;
+    uint[4] private _currentVotingRoundTotals;
     mapping(address => uint[4]) private _betRoundUserTotals;
     mapping(address => uint[4]) private _voteRoundsUserTotals;
     mapping(uint8 => EventRound) private _eventRounds;
@@ -371,12 +372,10 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         require(value > 0, "Bet amount should be > 0");
 
         // Update balances
-        _eventRounds[0].balances[resultIndex].total =
-            _eventRounds[0].balances[resultIndex].total.add(value);
-        _eventRounds[0].balances[resultIndex].bets[from] =
-            _eventRounds[0].balances[resultIndex].bets[from].add(value);
-        _resultTotals[resultIndex] = _resultTotals[resultIndex].add(value);
         _totalBets = _totalBets.add(value);
+        _betRoundTotals[resultIndex] = _betRoundTotals[resultIndex].add(value);
+        _betRoundUserTotals[from][resultIndex] =
+            _betRoundUserTotals[from][resultIndex].add(value);
 
         // Emit events
         emit BetPlaced(address(this), from, resultIndex, value, _currentRound);
@@ -414,12 +413,10 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         _currentRound = _currentRound + 1;
 
         // Update balances
-        _eventRounds[1].balances[resultIndex].total =
-            _eventRounds[1].balances[resultIndex].total.add(value);
-        _eventRounds[1].balances[resultIndex].bets[from] =
-            _eventRounds[1].balances[resultIndex].bets[from].add(value);
-        _resultTotals[resultIndex] = _resultTotals[resultIndex].add(value);
         _totalBets = _totalBets.add(value);
+        _voteRoundsTotals[resultIndex] = _voteRoundsTotals[resultIndex].add(value);
+        _voteRoundsUserTotals[from][resultIndex] =
+            _voteRoundsUserTotals[from][resultIndex].add(value);
 
         // Init DecentralizedOracle round
         uint nextThreshold = getNextThreshold(_eventRounds[0].consensusThreshold);
@@ -456,20 +453,19 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         require(value > 0, "Vote amount should be > 0");
 
         // Update balances
-        _eventRounds[_currentRound].balances[resultIndex].total =
-            _eventRounds[_currentRound].balances[resultIndex].total.add(value);
-        _eventRounds[_currentRound].balances[resultIndex].bets[from] =
-            _eventRounds[_currentRound].balances[resultIndex].bets[from].add(value);
-        _resultTotals[resultIndex] = _resultTotals[resultIndex].add(value);
         _totalBets = _totalBets.add(value);
+        _voteRoundsTotals[resultIndex] = _voteRoundsTotals[resultIndex].add(value);
+        _voteRoundsUserTotals[from][resultIndex] =
+            _voteRoundsUserTotals[from][resultIndex].add(value);
+        _currentVotingRoundTotals[resultIndex] = 
+            _currentVotingRoundTotals[resultIndex].add(value);
 
         // Emit events
         emit VotePlaced(address(this), from, resultIndex, value, _currentRound);
 
         // If voted over the threshold, create a new DecentralizedOracle round
-        uint resultVotes = _eventRounds[_currentRound].balances[resultIndex].total;
         uint threshold = _eventRounds[_currentRound].consensusThreshold;
-        if (resultVotes >= threshold) {
+        if (_currentVotingRoundTotals[resultIndex] >= threshold) {
             voteSetResult(from, resultIndex, value);
         }
     }
@@ -494,6 +490,9 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         _eventRounds[_currentRound].finished = true;
         _currentResultIndex = resultIndex;
         _currentRound = _currentRound + 1;
+
+        // Clear voting rounds totals
+        _currentVotingRoundTotals = new uint[4]();
 
         // Init next DecentralizedOracle round
         uint arbitrationEndTime = block.timestamp.add(_arbitrationLength);
