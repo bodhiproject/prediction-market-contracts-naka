@@ -160,6 +160,7 @@ contract('MultipleResultsEvent', (accounts) => {
       { from: OWNER, gas: MAX_GAS })
     nbotAddr = nbot.contract._address
     nbotMethods = nbot.contract.methods
+    await fundUsers({ nbotMethods, accounts })
 
     // Deploy ConfigManager
     configManager = await ConfigManager.new({ from: OWNER, gas: MAX_GAS })
@@ -201,7 +202,7 @@ contract('MultipleResultsEvent', (accounts) => {
       assert.equal(await eventMethods.owner().call(), OWNER)
       
       const eventMeta = await eventMethods.eventMetadata().call()
-      assert.equal(eventMeta[0], 4)
+      assert.equal(eventMeta[0], 5)
       assert.equal(eventMeta[1], 'Test Event 1')
       assert.equal(web3.utils.toUtf8(eventMeta[2][0]), RESULT_INVALID)
       assert.equal(web3.utils.toUtf8(eventMeta[2][1]), 'A')
@@ -387,10 +388,8 @@ contract('MultipleResultsEvent', (accounts) => {
   })
 
   describe('bet()', () => {
-    describe('valid bet time', () => {
+    describe('valid time', () => {
       beforeEach(async () => {
-        await fundUsers({ nbotMethods, accounts })
-  
         const currTime = await currentBlockTime()
         await timeMachine.increaseTime(Number(eventParams[2]) - currTime)
         assert.isAtLeast(await currentBlockTime(), Number(eventParams[2]))
@@ -480,11 +479,7 @@ contract('MultipleResultsEvent', (accounts) => {
       })
     })
 
-    describe('invalid bet time', () => {
-      beforeEach(async () => {
-        await fundUsers({ nbotMethods, accounts })
-      })
-
+    describe('invalid time', () => {
       it('throws if the current time is < betStartTime', async () => {
         assert.isBelow(await currentBlockTime(), Number(eventParams[2]))
 
@@ -525,11 +520,10 @@ contract('MultipleResultsEvent', (accounts) => {
     let threshold
 
     beforeEach(async () => {
-      await fundUsers({ nbotMethods, accounts })
       threshold = await eventMethods.currentConsensusThreshold().call()
     })
 
-    describe('valid set result time', () => {
+    describe('valid time', () => {
       beforeEach(async () => {
         const currTime = await currentBlockTime()
         await timeMachine.increaseTime(resultSetStartTime - currTime)
@@ -666,7 +660,7 @@ contract('MultipleResultsEvent', (accounts) => {
       })
     })
 
-    describe('invalid bet time', () => {
+    describe('invalid time', () => {
       it('throws if the current time is < resultSetStartTime', async () => {
         assert.isBelow(await currentBlockTime(), resultSetStartTime)
 
@@ -685,84 +679,13 @@ contract('MultipleResultsEvent', (accounts) => {
     })
   })
 
-  //   describe('vote()', () => {
-  //     beforeEach(async () => {
-  //       const threshold = await cOracle.consensusThreshold.call()
+  describe('vote()', () => {
+    describe('valid time', () => {
+    })
 
-  //       // Advance to result setting start time
-  //       await timeMachine.increaseTime(eventParams._resultSettingStartTime - currentBlockTime())
-  //       assert.isAtLeast(currentBlockTime(), eventParams._resultSettingStartTime)
-  //       assert.isBelow(currentBlockTime(), eventParams._resultSettingEndTime)
-
-  //       // Set the result
-  //       const setResultIndex = 3
-  //       const tx = await ContractHelper.transferSetResult(token, event, cOracle, OWNER, setResultIndex, threshold,
-  //         OWNER)
-
-  //       // Get dOracle
-  //       const dOracleAddress = paddedHexToAddress(tx.events['2'].raw.topics[2])
-  //       dOracle = await DecentralizedOracle.at(dOracleAddress)
-  //       assert.equal(await dOracle.lastResultIndex.call(), setResultIndex)
-  //     })
-
-  //     it('calls vote() correctly and sets the result when hitting the threshold', async () => {
-  //       // Vote
-  //       const threshold = await dOracle.consensusThreshold.call()
-  //       const voteIndex = 1
-  //       const tx = await ContractHelper.transferVote(token, event, dOracle, ACCT1, voteIndex, threshold)
-
-  //       // Validate event
-  //       assert.equal(await event.status.call(), EventStatus.ORACLE_VOTING)
-  //       assert.equal(await event.resultIndex.call(), voteIndex)
-
-  //       // Validate dOracle1
-  //       SolAssert.assertBNEqual((await dOracle.getTotalVotes())[voteIndex], threshold)
-  //       SolAssert.assertBNEqual((await dOracle.getVoteBalances({ from: ACCT1 }))[voteIndex], threshold)
-  //       assert.isTrue(await dOracle.finished.call())
-  //       assert.equal(await dOracle.resultIndex.call(), voteIndex)
-
-  //       // Validate dOracle2
-  //       const dOracle2Address = paddedHexToAddress(tx.events['2'].raw.topics[2])
-  //       const dOracle2 = await DecentralizedOracle.at(dOracle2Address)
-  //       assert.equal(await dOracle2.lastResultIndex.call(), voteIndex)
-  //       SolAssert.assertBNEqual(await dOracle2.consensusThreshold.call(),
-  //         percentIncrease(threshold, thresholdIncrease))
-  //     })
-
-  //     it('throws if the data length is not 76 bytes', async () => {
-  //       const voteAmount = toDenomination(50, tokenDecimals)
-  //       const voteIndex = 1
-  //       let data = '0x6f02d1fb'
-  //         + Qweb3Utils.trimHexPrefix(dOracle.address)
-  //         + Qweb3Utils.trimHexPrefix(ACCT1)
-  //         + Encoder.uintToHex(voteIndex)
-  //       assert.equal(data.length, 154)
-  //       data = data.slice(0, 152)
-  //       assert.equal(data.length, 152)
-
-  //       try {
-  //         await tokenWeb3Contract.methods["transfer(address,uint256,bytes)"](event.address, voteAmount, data)
-  //           .send({ from: ACCT1, gas: 5000000 })
-  //         assert.fail()
-  //       } catch (e) {
-  //         SolAssert.assertRevert(e)
-  //       }
-  //     })
-  //   })
-
-  //   it('throws if trying to call an unhandled function', async () => {
-  //     try {
-  //       await tokenWeb3Contract.methods["transfer(address,uint256,bytes)"](
-  //         event.address,
-  //         toDenomination(1, tokenDecimals),
-  //         '0xabcdef01'
-  //       ).send({ from: OWNER, gas: 5000000 })
-  //       assert.fail()
-  //     } catch (e) {
-  //       SolAssert.assertRevert(e)
-  //     }
-  //   })
-  // })
+    describe('invalid time', () => {
+    })
+  })
 
   // describe('finalizeResult()', () => {
   //   const cOracleResult = 1
