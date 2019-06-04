@@ -959,22 +959,106 @@ contract('MultipleResultsEvent', (accounts) => {
       // ACCT1 winner withdraws
       let winningAmt = toBN(await eventMethods.calculateWinnings(ACCT1).call())
       assert.isTrue(winningAmt.toNumber() > 0)
-      await eventMethods.withdraw().send({ from: ACCT1, gas: 200000 })
+      let receipt = await eventMethods.withdraw().send({ from: ACCT1, gas: 200000 })
+      sassert.event(receipt, 'WinningsWithdrawn')
+      assert.isTrue(await eventMethods.didWithdraw(ACCT1).call())
       sassert.bnEqual(
         await nbotMethods.balanceOf(eventAddr).call(),
         balance.sub(winningAmt))
       balance = balance.sub(winningAmt)
 
-      // OWNER winner withdraws
+      // OWNER winner withdraws winning amount and escrow
+      const ownerBal = toBN(await nbotMethods.balanceOf(OWNER).call())
       winningAmt = toBN(await eventMethods.calculateWinnings(OWNER).call())
       assert.isTrue(winningAmt.toNumber() > 0)
-      await eventMethods.withdraw().send({ from: OWNER, gas: 200000 })
+      receipt = await eventMethods.withdraw().send({ from: OWNER, gas: 200000 })
+      sassert.event(receipt, 'WinningsWithdrawn')
+      assert.isTrue(await eventMethods.didWithdraw(OWNER).call())
       sassert.bnEqual(
         await nbotMethods.balanceOf(eventAddr).call(),
         balance.sub(winningAmt))
+      sassert.bnEqual(
+        await nbotMethods.balanceOf(OWNER).call(),
+        ownerBal.add(winningAmt).add(toBN(escrowAmt)))
 
       // Contract should be empty
       assert.equal(await nbotMethods.balanceOf(eventAddr).call(), 0)
+    })
+
+    it('throws if trying to withdraw during round 0', async () => {
+      assert.equal(await eventMethods.currentRound().call(), 0)
+
+      try {
+        await eventMethods.withdraw().send({ from: OWNER, gas: 200000 })
+      } catch (e) {
+        sassert.revert(e, 'Cannot withdraw during betting round.')
+      }
+    })
+
+    it('throws if trying to withdraw before the arbitrationEndTime', async () => {
+      // Advance to result setting time
+      let currTime = await currentBlockTime()
+      await timeMachine.increaseTime(resultSetStartTime - currTime)
+      assert.isAtLeast(await currentBlockTime(), resultSetStartTime)
+
+      // Set result
+      const cOracleThreshold =
+        toBN(await eventMethods.currentConsensusThreshold().call())
+      await setResult({
+        nbotMethods,
+        eventAddr,
+        amt: cOracleThreshold.toString(),
+        resultIndex: 1,
+        from: OWNER,
+      })
+      assert.equal(await eventMethods.currentResultIndex().call(), 1)
+      assert.equal(await eventMethods.currentRound().call(), 1)
+
+      // Check if under arb end time
+      const arbEndTime = Number(await eventMethods.currentArbitrationEndTime().call())
+      assert.isBelow(await currentBlockTime(), arbEndTime)
+
+      try {
+        await eventMethods.withdraw().send({ from: OWNER, gas: 200000 })
+      } catch (e) {
+        sassert.revert(e, 'Current time should be >= arbitrationEndTime')
+      }
+    })
+
+    it('throws if trying to withdraw more than once', async () => {
+      // Advance to result setting time
+      let currTime = await currentBlockTime()
+      await timeMachine.increaseTime(resultSetStartTime - currTime)
+      assert.isAtLeast(await currentBlockTime(), resultSetStartTime)
+
+      // Set result
+      const cOracleThreshold =
+        toBN(await eventMethods.currentConsensusThreshold().call())
+      await setResult({
+        nbotMethods,
+        eventAddr,
+        amt: cOracleThreshold.toString(),
+        resultIndex: 1,
+        from: OWNER,
+      })
+      assert.equal(await eventMethods.currentResultIndex().call(), 1)
+      assert.equal(await eventMethods.currentRound().call(), 1)
+
+      // Advance to arbitration end time
+      currTime = await currentBlockTime()
+      const arbEndTime = Number(await eventMethods.currentArbitrationEndTime().call())
+      await timeMachine.increaseTime(arbEndTime - currTime)
+      assert.isAtLeast(await currentBlockTime(), arbEndTime)
+
+      // Withdraw once
+      await eventMethods.withdraw().send({ from: OWNER, gas: 200000 })
+      assert.isTrue(await eventMethods.didWithdraw(OWNER).call())
+
+      try {
+        await eventMethods.withdraw().send({ from: OWNER, gas: 200000 })
+      } catch (e) {
+        sassert.revert(e, 'Already withdrawn')
+      }
     })
   })
 
