@@ -1,6 +1,7 @@
-const { find, each, isPlainObject, isArray, isString } = require('lodash')
+const { find, each, isPlainObject, isArray, isString, isNumber } = require('lodash')
 
 const web3 = global.web3
+const { toBN, padRight } = web3.utils
 
 module.exports = class Utils {
   static addHexPrefix(str) {
@@ -19,12 +20,31 @@ module.exports = class Utils {
    * Converts the amount to a lower denomination.
    * @param {number|string} amount Amount to convert
    * @param {number} decimals Number of decimals
-   * @return {string} Amount as string number
+   * @return {BN} Amount as BN.js instance
    */
   static toDenomination(amount, decimals = 0) {
-    const bn = web3.utils.toBN(amount)
-    const decimalsBn = web3.utils.toBN(10 ** decimals)
-    return bn.mul(decimalsBn).toString(10)
+    if (((isString(amount) && amount.includes('.'))
+      || (isNumber(amount) && amount % 1 != 0))
+      && decimals > 0) {
+      const arr = amount.toString().split('.')
+      const whole = arr[0]
+      const dec = arr[1]
+
+      const wholeBn = toBN(10 ** decimals).mul(toBN(whole))
+      const decBn = toBN(padRight(dec, decimals))
+      return wholeBn.add(decBn)
+    }
+
+    return toBN(10 ** decimals).mul(toBN(amount))
+  }
+
+  /**
+   * Converts the amount to a lower denomination.
+   * @param {number|string} amount Amount to convert
+   * @return {BN} Amount as BN.js instance
+   */
+  static toSatoshi(amount) {
+    return Utils.toDenomination(amount, 8)
   }
 
   /*
@@ -34,16 +54,6 @@ module.exports = class Utils {
   */
   static bigNumberFloor(bigNumber) {
     return web3.toBigNumber(bigNumber.toString().split('.')[0])
-  }
-
-  /*
-  * Returns the original value increased by a percentage.
-  * @param bigNumber {BigNumber} The BigNumber to increase.
-  * @param percentage {BigNumber} The percent amount to increase the number by.
-  * @retun {BigNumber} The increased BigNumber by the percentage.
-  */
-  static percentIncrease(bigNumber, percentage) {
-    return bigNumber.times(web3.toBigNumber(percentage)).div(web3.toBigNumber(100)).plus(bigNumber)
   }
 
   // Gets the unix time in seconds of the current block
