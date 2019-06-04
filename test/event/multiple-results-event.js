@@ -894,7 +894,88 @@ contract('MultipleResultsEvent', (accounts) => {
     })
   })
 
-  describe('vote()', () => {
+  describe('withdraw()', () => {
+    it('withdraws the winning amount', async () => {
+      const cOracleResult = 1
+      let totalBets
+
+      // Advance to betting time
+      let currTime = await currentBlockTime()
+      await timeMachine.increaseTime(betStartTime - currTime)
+      assert.isAtLeast(await currentBlockTime(), betStartTime)
+      assert.isBelow(await currentBlockTime(), betEndTime)
+
+      // First round of betting
+      const bet1 = toSatoshi(100)
+      await placeBet({
+        nbotMethods,
+        eventAddr,
+        amtSatoshi: bet1.toString(),
+        resultIndex: 1,
+        from: ACCT1,
+      })
+      totalBets = bet1
+      sassert.bnEqual(await eventMethods.totalBets().call(), totalBets)
+
+      const bet2 = toSatoshi(100)
+      await placeBet({
+        nbotMethods,
+        eventAddr,
+        amtSatoshi: bet2.toString(),
+        resultIndex: 2,
+        from: ACCT2,
+      })
+      totalBets = totalBets.add(bet2)
+      sassert.bnEqual(await eventMethods.totalBets().call(), totalBets)
+
+      // Advance to result setting time
+      currTime = await currentBlockTime()
+      await timeMachine.increaseTime(resultSetStartTime - currTime)
+      assert.isAtLeast(await currentBlockTime(), resultSetStartTime)
+
+      // Set result 2
+      const cOracleThreshold =
+        toBN(await eventMethods.currentConsensusThreshold().call())
+      await setResult({
+        nbotMethods,
+        eventAddr,
+        amt: cOracleThreshold.toString(),
+        resultIndex: cOracleResult,
+        from: OWNER,
+      })
+      totalBets = totalBets.add(cOracleThreshold)
+      sassert.bnEqual(await eventMethods.totalBets().call(), totalBets)
+      assert.equal(await eventMethods.currentResultIndex().call(), cOracleResult)
+      assert.equal(await eventMethods.currentRound().call(), 1)
+
+      // Advance to arbitration end time
+      currTime = await currentBlockTime()
+      const arbEndTime = Number(await eventMethods.currentArbitrationEndTime().call())
+      await timeMachine.increaseTime(arbEndTime - currTime)
+      assert.isAtLeast(await currentBlockTime(), arbEndTime)
+
+      let balance = toBN(await nbotMethods.balanceOf(eventAddr).call())
+
+      // ACCT1 winner withdraws
+      let winningAmt = toBN(await eventMethods.calculateWinnings(ACCT1).call())
+      assert.isTrue(winningAmt.toNumber() > 0)
+      await eventMethods.withdraw().send({ from: ACCT1, gas: 200000 })
+      sassert.bnEqual(
+        await nbotMethods.balanceOf(eventAddr).call(),
+        balance.sub(winningAmt))
+      balance = balance.sub(winningAmt)
+
+      // OWNER winner withdraws
+      winningAmt = toBN(await eventMethods.calculateWinnings(OWNER).call())
+      assert.isTrue(winningAmt.toNumber() > 0)
+      await eventMethods.withdraw().send({ from: OWNER, gas: 200000 })
+      sassert.bnEqual(
+        await nbotMethods.balanceOf(eventAddr).call(),
+        balance.sub(winningAmt))
+
+      // Contract should be empty
+      assert.equal(await nbotMethods.balanceOf(eventAddr).call(), 0)
+    })
   })
 
   describe('calculateWinnings', () => {
@@ -1059,7 +1140,7 @@ contract('MultipleResultsEvent', (accounts) => {
       totalBets = totalBets.add(vote2b)
       sassert.bnEqual(await eventMethods.totalBets().call(), totalBets)
 
-      // Advance to finalize time
+      // Advance to arbitration end time
       currTime = await currentBlockTime()
       const arbEndTime = Number(await eventMethods.currentArbitrationEndTime().call())
       await timeMachine.increaseTime(arbEndTime - currTime)
