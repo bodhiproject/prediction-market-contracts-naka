@@ -897,8 +897,8 @@ contract('MultipleResultsEvent', (accounts) => {
   describe('vote()', () => {
   })
 
-  describe.only('calculateWinnings', () => {
-    it('returns the amount for an non-invalid result', async () => {
+  describe('calculateWinnings', () => {
+    it('returns the amount for a non-invalid result', async () => {
       const cOracleResult = 2
       const dOracle1Result = 0
       const dOracle2Result = 2
@@ -1142,6 +1142,101 @@ contract('MultipleResultsEvent', (accounts) => {
         ...calcParams,
       })
       sassert.bnEqual(await eventMethods.calculateWinnings(ACCT2).call(), winningAmt)
+    })
+
+    it('returns the amount for an invalid result', async () => {
+      const cOracleResult = 0
+      let totalBets
+
+      // Advance to betting time
+      let currTime = await currentBlockTime()
+      await timeMachine.increaseTime(betStartTime - currTime)
+      assert.isAtLeast(await currentBlockTime(), betStartTime)
+      assert.isBelow(await currentBlockTime(), betEndTime)
+
+      // First round of betting
+      const bet1 = toSatoshi(12)
+      await placeBet({
+        nbotMethods,
+        eventAddr,
+        amtSatoshi: bet1.toString(),
+        resultIndex: 0,
+        from: ACCT1,
+      })
+      totalBets = bet1
+      sassert.bnEqual(await eventMethods.totalBets().call(), totalBets)
+
+      const bet2 = toSatoshi(23)
+      await placeBet({
+        nbotMethods,
+        eventAddr,
+        amtSatoshi: bet2.toString(),
+        resultIndex: 1,
+        from: ACCT2,
+      })
+      totalBets = totalBets.add(bet2)
+      sassert.bnEqual(await eventMethods.totalBets().call(), totalBets)
+
+      const bet3 = toSatoshi(30)
+      await placeBet({
+        nbotMethods,
+        eventAddr,
+        amtSatoshi: bet3.toString(),
+        resultIndex: cOracleResult,
+        from: ACCT3,
+      })
+      totalBets = totalBets.add(bet3)
+      sassert.bnEqual(await eventMethods.totalBets().call(), totalBets)
+
+      const bet4 = toSatoshi(12)
+      await placeBet({
+        nbotMethods,
+        eventAddr,
+        amtSatoshi: bet4.toString(),
+        resultIndex: cOracleResult,
+        from: ACCT4,
+      })
+      totalBets = totalBets.add(bet4)
+      sassert.bnEqual(await eventMethods.totalBets().call(), totalBets)
+
+      // Advance to result setting time
+      currTime = await currentBlockTime()
+      await timeMachine.increaseTime(resultSetStartTime - currTime)
+      assert.isAtLeast(await currentBlockTime(), resultSetStartTime)
+
+      // Set result 2
+      const cOracleThreshold =
+        toBN(await eventMethods.currentConsensusThreshold().call())
+      await setResult({
+        nbotMethods,
+        eventAddr,
+        amt: cOracleThreshold.toString(),
+        resultIndex: cOracleResult,
+        from: OWNER,
+      })
+      totalBets = totalBets.add(cOracleThreshold)
+      sassert.bnEqual(await eventMethods.totalBets().call(), totalBets)
+      assert.equal(await eventMethods.currentResultIndex().call(), cOracleResult)
+      assert.equal(await eventMethods.currentRound().call(), 1)
+
+      // ACCT1 should get all their bets back
+      sassert.bnEqual(await eventMethods.calculateWinnings(ACCT1).call(), bet1)
+
+      // ACCT2 should get all their bets back
+      sassert.bnEqual(await eventMethods.calculateWinnings(ACCT2).call(), bet2)
+
+      // ACCT3 should get all their bets back
+      sassert.bnEqual(await eventMethods.calculateWinnings(ACCT3).call(), bet3)
+
+      // ACCT4 should get all their bets back
+      sassert.bnEqual(await eventMethods.calculateWinnings(ACCT4).call(), bet4)
+    })
+
+    it('returns 0 if currentResultIndex is invalid', async () => {
+      assert.equal(
+        await eventMethods.currentResultIndex().call(),
+        RESULT_INDEX_INVALID)
+      sassert.bnEqual(await eventMethods.calculateWinnings(OWNER).call(), 0)
     })
   })
 })
