@@ -36,6 +36,8 @@ const fundUsers = async ({ nbotMethods, accounts }) => {
     .send({ from: accounts[0] })
   await nbotMethods.transfer(accounts[4], toSatoshi(10000).toString())
     .send({ from: accounts[0] })
+  await nbotMethods.transfer(accounts[5], toSatoshi(10000).toString())
+    .send({ from: accounts[0] })
 }
 
 const getEventParams = async (cOracle) => {
@@ -129,6 +131,42 @@ const placeVote = async (
   ).send({ from, gas: 400000 })
 }
 
+const calculateNormalWinnings = ({
+  maxPercent,
+  arbRewardPercent,
+  arbRewardPercentComp,
+  betRoundWinnersTotal,
+  betRoundLosersTotal,
+  voteRoundsWinnersTotal,
+  voteRoundsLosersTotal,
+  myWinningBets,
+  myWinningVotes,
+}) => {
+  let betRoundWinningAmt = toBN(0)
+  if (myWinningBets.gt(0)) {
+    betRoundWinningAmt = betRoundLosersTotal
+      .mul(arbRewardPercentComp)
+      .div(maxPercent)
+      .mul(myWinningBets)
+      .div(betRoundWinnersTotal)
+  }
+
+  let voteRoundsWinningAmt = toBN(0)
+  if (myWinningVotes.gt(0)) {
+    voteRoundsWinningAmt = betRoundLosersTotal
+      .mul(arbRewardPercent)
+      .div(maxPercent)
+      .add(voteRoundsLosersTotal)
+      .mul(myWinningVotes)
+      .div(voteRoundsWinnersTotal)
+  }
+
+  return myWinningBets
+    .add(myWinningVotes)
+    .add(betRoundWinningAmt)
+    .add(voteRoundsWinningAmt)
+}
+
 contract('MultipleResultsEvent', (accounts) => {
   const {
     OWNER,
@@ -136,6 +174,7 @@ contract('MultipleResultsEvent', (accounts) => {
     ACCT2,
     ACCT3,
     ACCT4,
+    ACCT5,
     INVALID_ADDR,
     MAX_GAS,
   } = getConstants(accounts)
@@ -858,14 +897,12 @@ contract('MultipleResultsEvent', (accounts) => {
   describe('vote()', () => {
   })
 
-  describe('calculateWinnings', () => {
-    const cOracleResult = 2
-
-    it.only('returns the amount for an non-invalid result', async () => {
+  describe.only('calculateWinnings', () => {
+    it('returns the amount for an non-invalid result', async () => {
+      const cOracleResult = 2
       const dOracle1Result = 0
       const dOracle2Result = 2
       let totalBets
-      let totalVotes
 
       // Advance to betting time
       let currTime = await currentBlockTime()
@@ -874,8 +911,7 @@ contract('MultipleResultsEvent', (accounts) => {
       assert.isBelow(await currentBlockTime(), betEndTime)
 
       // First round of betting
-      const bet1 = toSatoshi(12.3456789)
-      console.log('NAKA: bet1', bet1.toString());
+      const bet1 = toSatoshi(12)
       await placeBet({
         nbotMethods,
         eventAddr,
@@ -886,8 +922,7 @@ contract('MultipleResultsEvent', (accounts) => {
       totalBets = bet1
       sassert.bnEqual(await eventMethods.totalBets().call(), totalBets)
 
-      const bet2 = toSatoshi(23.45678901)
-      console.log('NAKA: bet2', bet2.toString());
+      const bet2 = toSatoshi(23)
       await placeBet({
         nbotMethods,
         eventAddr,
@@ -895,177 +930,218 @@ contract('MultipleResultsEvent', (accounts) => {
         resultIndex: 1,
         from: ACCT2,
       })
-      totalBets = bet1.add(bet2)
+      totalBets = totalBets.add(bet2)
       sassert.bnEqual(await eventMethods.totalBets().call(), totalBets)
 
-      throw Error('fail purpose')
+      const bet3 = toSatoshi(30)
+      await placeBet({
+        nbotMethods,
+        eventAddr,
+        amtSatoshi: bet3.toString(),
+        resultIndex: cOracleResult,
+        from: ACCT3,
+      })
+      totalBets = totalBets.add(bet3)
+      sassert.bnEqual(await eventMethods.totalBets().call(), totalBets)
 
-      bet3 = toSatoshi(30.47682524, TOKEN_DECIMALS)
-      await event.bet(cOracle.address, cOracleResult, { from: ACCT3, value: bet3 })
-      totalBets = bet1.add(bet2).add(bet3)
-      SolAssert.assertBNEqual(toSatoshi(await web3.eth.getBalance(event.address)), totalBets)
-
-      bet4 = toSatoshi(12.18956777, TOKEN_DECIMALS)
-      await event.bet(cOracle.address, cOracleResult, { from: ACCT4, value: bet4 })
-      totalBets = bet1.add(bet2).add(bet3).add(bet4)
-      SolAssert.assertBNEqual(toSatoshi(await web3.eth.getBalance(event.address)), totalBets)
-
-      SolAssert.assertBNEqual(await event.totalBetTokens.call(), totalBets)
+      const bet4 = toSatoshi(12)
+      await placeBet({
+        nbotMethods,
+        eventAddr,
+        amtSatoshi: bet4.toString(),
+        resultIndex: cOracleResult,
+        from: ACCT4,
+      })
+      totalBets = totalBets.add(bet4)
+      sassert.bnEqual(await eventMethods.totalBets().call(), totalBets)
 
       // Advance to result setting time
-      await timeMachine.increaseTime(eventParams._resultSettingStartTime - currentBlockTime())
-      assert.isAtLeast(currentBlockTime(), eventParams._resultSettingStartTime)
+      currTime = await currentBlockTime()
+      await timeMachine.increaseTime(resultSetStartTime - currTime)
+      assert.isAtLeast(await currentBlockTime(), resultSetStartTime)
 
       // Set result 2
-      let tx = await ContractHelper.transferSetResult(token, event, cOracle, OWNER, cOracleResult, cOracleThreshold)
-      const dOracleAddress = paddedHexToAddress(tx.events['2'].raw.topics[2])
-      dOracle = await DecentralizedOracle.at(dOracleAddress)
-
-      totalVotes = cOracleThreshold
-      SolAssert.assertBNEqual(await event.totalArbitrationTokens.call(), totalVotes)
-      assert.equal((await event.getFinalResult())[0], cOracleResult)
+      const cOracleThreshold =
+        toBN(await eventMethods.currentConsensusThreshold().call())
+      await setResult({
+        nbotMethods,
+        eventAddr,
+        amt: cOracleThreshold.toString(),
+        resultIndex: cOracleResult,
+        from: OWNER,
+      })
+      totalBets = totalBets.add(cOracleThreshold)
+      sassert.bnEqual(await eventMethods.totalBets().call(), totalBets)
+      assert.equal(await eventMethods.currentResultIndex().call(), cOracleResult)
+      assert.equal(await eventMethods.currentRound().call(), 1)
 
       // dOracle1 voting. Threshold hits and result becomes 0.
-      const vote1a = toSatoshi(60.12345678, tokenDecimals)
-      await ContractHelper.transferVote(token, event, dOracle, ACCT1, dOracle1Result, vote1a)
-      SolAssert.assertBNEqual((await event.getVoteBalances({ from: ACCT1 }))[dOracle1Result], vote1a)
+      const vote1a = toSatoshi(60)
+      await placeVote({
+        nbotMethods,
+        eventAddr,
+        amtSatoshi: vote1a.toString(),
+        resultIndex: dOracle1Result,
+        from: ACCT1,
+      })
+      totalBets = totalBets.add(vote1a)
+      sassert.bnEqual(await eventMethods.totalBets().call(), totalBets)
 
-      const vote2a = toSatoshi(49.87654322, tokenDecimals)
-      tx = await ContractHelper.transferVote(token, event, dOracle, ACCT2, dOracle1Result, vote2a)
-      SolAssert.assertBNEqual((await event.getVoteBalances({ from: ACCT2 }))[dOracle1Result], vote2a)
-
-      totalVotes = totalVotes.add(vote1a).add(vote2a)
-      SolAssert.assertBNEqual(await event.totalArbitrationTokens.call(), totalVotes)
-      assert.equal((await event.getFinalResult())[0], dOracle1Result)
-
-      // Get dOracle2
-      const dOracle2Address = paddedHexToAddress(tx.events['2'].raw.topics[2])
-      const dOracle2 = await DecentralizedOracle.at(dOracle2Address)
+      const vote2a = toSatoshi(50)
+      await placeVote({
+        nbotMethods,
+        eventAddr,
+        amtSatoshi: vote2a.toString(),
+        resultIndex: dOracle1Result,
+        from: ACCT2,
+      })
+      totalBets = totalBets.add(vote2a)
+      sassert.bnEqual(await eventMethods.totalBets().call(), totalBets)
+      assert.equal(await eventMethods.currentResultIndex().call(), dOracle1Result)
+      assert.equal(await eventMethods.currentRound().call(), 2)
 
       // dOracle2 voting. Threshold hits and result becomes 2.
-      const vote3a = toSatoshi(30.12345678, tokenDecimals)
-      await ContractHelper.transferVote(token, event, dOracle2, ACCT3, dOracle2Result, vote3a)
-      SolAssert.assertBNEqual((await event.getVoteBalances({ from: ACCT3 }))[dOracle2Result], vote3a)
+      const vote3a = toSatoshi(41)
+      await placeVote({
+        nbotMethods,
+        eventAddr,
+        amtSatoshi: vote3a.toString(),
+        resultIndex: dOracle2Result,
+        from: ACCT3,
+      })
+      totalBets = totalBets.add(vote3a)
+      sassert.bnEqual(await eventMethods.totalBets().call(), totalBets)
 
-      const vote4a = toSatoshi(40.87654321, tokenDecimals)
-      await ContractHelper.transferVote(token, event, dOracle2, ACCT4, dOracle2Result, vote4a)
-      SolAssert.assertBNEqual((await event.getVoteBalances({ from: ACCT4 }))[dOracle2Result], vote4a)
+      const vote4a = toSatoshi(43)
+      await placeVote({
+        nbotMethods,
+        eventAddr,
+        amtSatoshi: vote4a.toString(),
+        resultIndex: dOracle2Result,
+        from: ACCT4,
+      })
+      totalBets = totalBets.add(vote4a)
+      sassert.bnEqual(await eventMethods.totalBets().call(), totalBets)
 
-      const vote5a = toSatoshi(50.00000001, tokenDecimals)
-      tx = await ContractHelper.transferVote(token, event, dOracle2, ACCT5, dOracle2Result, vote5a)
-      SolAssert.assertBNEqual((await event.getVoteBalances({ from: ACCT5 }))[dOracle2Result], vote5a)
+      const vote5a = toSatoshi(37)
+      await placeVote({
+        nbotMethods,
+        eventAddr,
+        amtSatoshi: vote5a.toString(),
+        resultIndex: dOracle2Result,
+        from: ACCT5,
+      })
+      totalBets = totalBets.add(vote5a)
+      sassert.bnEqual(await eventMethods.totalBets().call(), totalBets)
+      assert.equal(await eventMethods.currentResultIndex().call(), dOracle2Result)
+      assert.equal(await eventMethods.currentRound().call(), 3)
 
-      totalVotes = totalVotes.add(vote3a).add(vote4a).add(vote5a)
-      SolAssert.assertBNEqual(await event.totalArbitrationTokens.call(), totalVotes)
-      assert.equal((await event.getFinalResult())[0], dOracle2Result)
+      // dOracle3 voting. Does not hit threshold and result gets finalized to 2.
+      const vote1b = toSatoshi(53)
+      await placeVote({
+        nbotMethods,
+        eventAddr,
+        amtSatoshi: vote1b.toString(),
+        resultIndex: dOracle1Result,
+        from: ACCT1,
+      })
+      totalBets = totalBets.add(vote1b)
+      sassert.bnEqual(await eventMethods.totalBets().call(), totalBets)
 
-      // Get dOracle3
-      const dOracle3Address = paddedHexToAddress(tx.events['2'].raw.topics[2])
-      const dOracle3 = await DecentralizedOracle.at(dOracle3Address)
-
-      // dOracle3 voting. Does not his threshold and result gets finalized to 2.
-      const vote1b = toSatoshi(53.77777777, tokenDecimals)
-      await ContractHelper.transferVote(token, event, dOracle3, ACCT1, dOracle1Result, vote1b)
-      const totalVote1 = vote1a.add(vote1b)
-      SolAssert.assertBNEqual((await event.getVoteBalances({ from: ACCT1 }))[dOracle1Result], totalVote1)
-
-      const vote2b = toSatoshi(49.55555555, tokenDecimals)
-      await ContractHelper.transferVote(token, event, dOracle3, ACCT2, dOracle1Result, vote2b)
-      const totalVote2 = vote2a.add(vote2b)
-      SolAssert.assertBNEqual((await event.getVoteBalances({ from: ACCT2 }))[dOracle1Result], totalVote2)
+      const vote2b = toSatoshi(49)
+      await placeVote({
+        nbotMethods,
+        eventAddr,
+        amtSatoshi: vote2b.toString(),
+        resultIndex: dOracle1Result,
+        from: ACCT2,
+      })
+      totalBets = totalBets.add(vote2b)
+      sassert.bnEqual(await eventMethods.totalBets().call(), totalBets)
 
       // Advance to finalize time
-      const arbitrationEndTime = (await dOracle3.arbitrationEndTime.call()).toNumber()
-      await timeMachine.increaseTime(arbitrationEndTime - currentBlockTime())
-      assert.isAtLeast(currentBlockTime(), arbitrationEndTime)
-      
-      // Finalize result 2
-      await event.finalizeResult(dOracle3.address)
-      assert.equal(await event.status.call(), EventStatus.COLLECTION)
-      const finalResult = await event.getFinalResult()
-      assert.equal(finalResult[0], dOracle2Result)
-      assert.isTrue(finalResult[1])
+      currTime = await currentBlockTime()
+      const arbEndTime = Number(await eventMethods.currentArbitrationEndTime().call())
+      await timeMachine.increaseTime(arbEndTime - currTime)
+      assert.isAtLeast(await currentBlockTime(), arbEndTime)
 
       // Withdraw winnings: ACCT3, ACCT4, ACCT5, ORACLE
-      const percentCut = await event.ARBITRATION_REWARD_PERCENTAGE.call()
-      let losersBetTokens = bet1.add(bet2)
-      const winnersBetTokens = bet3.add(bet4)
-      const rewardBetTokens = bigNumberFloor(losersBetTokens.mul(percentCut).div(100))
-      losersBetTokens = losersBetTokens.sub(rewardBetTokens)
-      const losersArbTokens = vote1a.add(vote2a).add(vote1b).add(vote2b)
-      const winnersArbTokens = cOracleThreshold.add(vote3a).add(vote4a).add(vote5a)
+      const maxPercent = toBN(100)
+      const arbRewardPercent = toBN((await eventMethods.configMetadata().call())[3])
+      const arbRewardPercentComp = maxPercent.sub(arbRewardPercent)
+      const betRoundWinnersTotal = bet3.add(bet4)
+      const betRoundLosersTotal = bet1.add(bet2)
+      const voteRoundsWinnersTotal = cOracleThreshold.add(vote3a).add(vote4a).add(vote5a)
+      const voteRoundsLosersTotal = vote1a.add(vote2a).add(vote1b).add(vote2b)
+      const calcParams = {
+        maxPercent,
+        arbRewardPercent,
+        arbRewardPercentComp,
+        betRoundWinnersTotal,
+        betRoundLosersTotal,
+        voteRoundsWinnersTotal,
+        voteRoundsLosersTotal,
+      }
 
       // ACCT3 winner
-      let votes = vote3a
-      let expectedArbTokens = bigNumberFloor(votes.mul(losersArbTokens).div(winnersArbTokens).add(votes))
-      let winnerBetTokenReward = bigNumberFloor(votes.mul(rewardBetTokens).div(winnersArbTokens))
-
-      let bets = bet3
-      let expectedBetTokens = bigNumberFloor(bets.mul(losersBetTokens).div(winnersBetTokens).add(bets))
-      expectedBetTokens = expectedBetTokens.add(winnerBetTokenReward)
-
-      let winningsArr = await event.calculateWinnings({ from: ACCT3 })
-      SolAssert.assertBNEqual(winningsArr[0], expectedArbTokens)
-      SolAssert.assertBNEqual(winningsArr[1], expectedBetTokens)
+      let myWinningBets = bet3
+      let myWinningVotes = vote3a
+      let winningAmt = calculateNormalWinnings({
+        myWinningBets,
+        myWinningVotes,
+        ...calcParams,
+      })
+      sassert.bnEqual(await eventMethods.calculateWinnings(ACCT3).call(), winningAmt)
 
       // ACCT4 winner
-      votes = vote4a
-      expectedArbTokens = bigNumberFloor(votes.mul(losersArbTokens).div(winnersArbTokens).add(votes))
-      winnerBetTokenReward = bigNumberFloor(votes.mul(rewardBetTokens).div(winnersArbTokens))
-
-      bets = bet4
-      expectedBetTokens = bigNumberFloor(bets.mul(losersBetTokens).div(winnersBetTokens).add(bets))
-      expectedBetTokens = expectedBetTokens.add(winnerBetTokenReward)
-
-      winningsArr = await event.calculateWinnings({ from: ACCT4 })
-      SolAssert.assertBNEqual(winningsArr[0], expectedArbTokens)
-      SolAssert.assertBNEqual(winningsArr[1], expectedBetTokens)
+      myWinningBets = bet4
+      myWinningVotes = vote4a
+      winningAmt = calculateNormalWinnings({
+        myWinningBets,
+        myWinningVotes,
+        ...calcParams,
+      })
+      sassert.bnEqual(await eventMethods.calculateWinnings(ACCT4).call(), winningAmt)
 
       // ACCT5 winner
-      votes = vote5a
-      expectedArbTokens = bigNumberFloor(votes.mul(losersArbTokens).div(winnersArbTokens).add(votes))
-      winnerBetTokenReward = bigNumberFloor(votes.mul(rewardBetTokens).div(winnersArbTokens))
-
-      bets = toSatoshi(0)
-      expectedBetTokens = bigNumberFloor(bets.mul(losersBetTokens).div(winnersBetTokens).add(bets))
-      expectedBetTokens = expectedBetTokens.add(winnerBetTokenReward)
-
-      winningsArr = await event.calculateWinnings({ from: ACCT5 })
-      SolAssert.assertBNEqual(winningsArr[0], expectedArbTokens)
-      SolAssert.assertBNEqual(winningsArr[1], expectedBetTokens)
+      myWinningBets = toBN(0)
+      myWinningVotes = vote5a
+      winningAmt = calculateNormalWinnings({
+        myWinningBets,
+        myWinningVotes,
+        ...calcParams,
+      })
+      sassert.bnEqual(await eventMethods.calculateWinnings(ACCT5).call(), winningAmt)
 
       // CentralizedOracle winner
-      votes = cOracleThreshold
-      expectedArbTokens = bigNumberFloor(votes.mul(losersArbTokens).div(winnersArbTokens).add(votes))
-      winnerBetTokenReward = bigNumberFloor(votes.mul(rewardBetTokens).div(winnersArbTokens))
-
-      bets = toSatoshi(0)
-      expectedBetTokens = bigNumberFloor(bets.mul(losersBetTokens).div(winnersBetTokens).add(bets))
-      expectedBetTokens = expectedBetTokens.add(winnerBetTokenReward)
-
-      winningsArr = await event.calculateWinnings({ from: OWNER })
-      SolAssert.assertBNEqual(winningsArr[0], expectedArbTokens)
-      SolAssert.assertBNEqual(winningsArr[1], expectedBetTokens)
+      myWinningBets = toBN(0)
+      myWinningVotes = cOracleThreshold
+      winningAmt = calculateNormalWinnings({
+        myWinningBets,
+        myWinningVotes,
+        ...calcParams,
+      })
+      sassert.bnEqual(await eventMethods.calculateWinnings(OWNER).call(), winningAmt)
 
       // ACCT1 loser
-      winningsArr = await event.calculateWinnings({ from: ACCT1 })
-      SolAssert.assertBNEqual(winningsArr[0], 0)
-      SolAssert.assertBNEqual(winningsArr[1], 0)
+      myWinningBets = toBN(0)
+      myWinningVotes = toBN(0)
+      winningAmt = calculateNormalWinnings({
+        myWinningBets,
+        myWinningVotes,
+        ...calcParams,
+      })
+      sassert.bnEqual(await eventMethods.calculateWinnings(ACCT1).call(), winningAmt)
 
       // ACCT2 loser
-      winningsArr = await event.calculateWinnings({ from: ACCT2 })
-      SolAssert.assertBNEqual(winningsArr[0], 0)
-      SolAssert.assertBNEqual(winningsArr[1], 0)
-    })
-
-    it('throws if status is not Status.Collection', async () => {
-      assert.notEqual(await event.status.call(), EventStatus.COLLECTION)
-      try {
-        await event.calculateWinnings({ from: ACCT3 })
-        assert.fail()
-      } catch (e) {
-        SolAssert.assertRevert(e)
-      }
+      myWinningBets = toBN(0)
+      myWinningVotes = toBN(0)
+      winningAmt = calculateNormalWinnings({
+        myWinningBets,
+        myWinningVotes,
+        ...calcParams,
+      })
+      sassert.bnEqual(await eventMethods.calculateWinnings(ACCT2).call(), winningAmt)
     })
   })
 })
