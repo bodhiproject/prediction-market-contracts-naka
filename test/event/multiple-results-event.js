@@ -22,6 +22,7 @@ const CREATE_EVENT_FUNC_SIG = '662edd20'
 const BET_FUNC_SIG = '885ab66d'
 const SET_RESULT_FUNC_SIG = 'a6b4218b'
 const RESULT_INVALID = 'Invalid'
+const RESULT_INDEX_INVALID = 255
 const TOKEN_DECIMALS = 8
 
 const fundUsers = async ({ nbotMethods, accounts }) => {
@@ -44,10 +45,10 @@ const getEventParams = async (cOracle) => {
       web3.utils.fromAscii('B'),
       web3.utils.fromAscii('C'),
     ],
-    `${currTime + 1000}`,
-    `${currTime + 3000}`,
-    `${currTime + 4000}`,
-    `${currTime + 6000}`,
+    currTime + 1000,
+    currTime + 3000,
+    currTime + 4000,
+    currTime + 6000,
     cOracle,
     0,
     10,
@@ -139,6 +140,10 @@ contract('MultipleResultsEvent', (accounts) => {
   let eventMethods
   let eventParams
   let escrowAmt
+  let betStartTime
+  let betEndTime
+  let resultSetStartTime
+  let resultSetEndTime
 
   beforeEach(timeMachine.snapshot)
   afterEach(timeMachine.revert)
@@ -170,8 +175,14 @@ contract('MultipleResultsEvent', (accounts) => {
     eventFactoryAddr = eventFactory.contract._address
     configManagerMethods.setEventFactory(eventFactoryAddr).send({ from: OWNER })
 
-    // NBOT.transfer() -> create event
+    // Setup event params
     eventParams = await getEventParams(OWNER)
+    betStartTime = eventParams[2]
+    betEndTime = eventParams[3]
+    resultSetStartTime = eventParams[4]
+    resultSetEndTime = eventParams[5]
+
+    // NBOT.transfer() -> create event
     eventAddr = await createEvent({
       nbotMethods,
       eventParams,
@@ -450,6 +461,135 @@ contract('MultipleResultsEvent', (accounts) => {
           })
         } catch (e) {
           sassert.revert(e, 'resultIndex is not valid')
+        }
+      })
+
+      it('throws if the bet amount is 0', async () => {
+        try {
+          await placeBet({
+            nbotMethods,
+            eventAddr,
+            amtDecimals: 0,
+            resultIndex: 0,
+            from: OWNER,
+          })
+        } catch (e) {
+          sassert.revert(e, 'Bet amount should be > 0')
+        }
+      })
+    })
+
+    describe('invalid bet time', () => {
+      beforeEach(async () => {
+        await fundUsers({ nbotMethods, accounts })
+      })
+
+      it('throws if the current time is < betStartTime', async () => {
+        assert.isBelow(await currentBlockTime(), Number(eventParams[2]))
+
+        try {
+          await placeBet({
+            nbotMethods,
+            eventAddr,
+            amtDecimals: 1,
+            resultIndex: 0,
+            from: OWNER,
+          })
+        } catch (e) {
+          sassert.revert(e, 'Current time should be >= betStartTime')
+        }
+      })
+
+      it('throws if the current time is > betEndTime', async () => {
+        const currTime = await currentBlockTime()
+        await timeMachine.increaseTime(Number(eventParams[3]) - currTime)
+        assert.isAtLeast(await currentBlockTime(), Number(eventParams[3]))
+
+        try {
+          await placeBet({
+            nbotMethods,
+            eventAddr,
+            amtDecimals: 1,
+            resultIndex: 0,
+            from: OWNER,
+          })
+        } catch (e) {
+          sassert.revert(e, 'Current time should be < betEndTime.')
+        }
+      })
+    })
+  })
+
+  describe.only('setResult()', () => {
+    describe('valid set result time', () => {
+      let threshold
+
+      beforeEach(async () => {
+        await fundUsers({ nbotMethods, accounts })
+        threshold = await eventMethods.currentConsensusThreshold().call()
+  
+        const currTime = await currentBlockTime()
+        await timeMachine.increaseTime(resultSetStartTime - currTime)
+        assert.isAtLeast(await currentBlockTime(), resultSetStartTime)
+      })
+
+      it('sets the result', async () => {
+        assert.equal(
+          await eventMethods.currentResultIndex().call(),
+          RESULT_INDEX_INVALID)
+
+        await setResult({
+          nbotMethods,
+          eventAddr,
+          amt: threshold,
+          resultIndex: 1,
+          from: OWNER,
+        })
+        assert.equal(await eventMethods.currentResultIndex().call(), 1)
+        assert.equal(await eventMethods.currentRound().call(), 1)
+        assert.equal(await eventMethods.totalBets().call(), threshold)
+        sassert.bnGTE(
+          await eventMethods.currentConsensusThreshold().call(),
+          threshold)
+        sassert.bnGTE(
+          await eventMethods.currentArbitrationEndTime().call(),
+          resultSetEndTime)
+      })
+
+      it('throws if the resultIndex is invalid', async () => {
+        try {
+          await setResult({
+            nbotMethods,
+            eventAddr,
+            amt: threshold,
+            resultIndex: 2,
+            from: OWNER,
+          })
+        } catch (e) {
+          sassert.revert(e, 'Can only set result during the betting round')
+        }
+      })
+  
+      it('throws if the currentRound is not 0', async () => {
+        await setResult({
+          nbotMethods,
+          eventAddr,
+          amt: threshold,
+          resultIndex: 1,
+          from: OWNER,
+        })
+        assert.equal(await eventMethods.currentRound().call(), 1)
+
+        try {
+          await setResult({
+            nbotMethods,
+            eventAddr,
+            amt: threshold,
+            resultIndex: 2,
+            from: OWNER,
+          })
+        } catch (e) {
+          sassert.revert(e, 'Can only set result during the betting round')
         }
       })
 
