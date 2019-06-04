@@ -22,7 +22,7 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         uint arbitrationEndTime;
     }
 
-    uint16 private constant VERSION = 4;
+    uint16 private constant VERSION = 5;
     uint8 private constant INVALID_RESULT_INDEX = 255;
 
     uint8 private _numOfResults;
