@@ -13,12 +13,6 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
     using ByteUtils for bytes32;
     using SafeMath for uint;
 
-    /// @dev Represents all the bets of a result.
-    struct ResultBalance {
-        uint total;
-        mapping(address => uint) bets;
-    }
-
     /// @dev Represents the aggregated bets/votes of a round.
     struct EventRound {
         bool finished;
@@ -26,10 +20,9 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         uint8 resultIndex;
         uint consensusThreshold;
         uint arbitrationEndTime;
-        ResultBalance[4] balances;
     }
 
-    uint16 private constant VERSION = 3;
+    uint16 private constant VERSION = 5;
     uint8 private constant INVALID_RESULT_INDEX = 255;
 
     uint8 private _numOfResults;
@@ -49,7 +42,11 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
     uint private _thresholdPercentIncrease;
     uint private _arbitrationRewardPercentage;
     uint private _totalBets;
-    uint[4] private _resultTotals;
+    uint[4] private _betRoundTotals;
+    uint[4] private _voteRoundsTotals;
+    uint[4] private _currentVotingRoundTotals;
+    mapping(address => uint[4]) private _betRoundUserTotals;
+    mapping(address => uint[4]) private _voteRoundsUserTotals;
     mapping(uint8 => EventRound) private _eventRounds;
     mapping(address => bool) private _didWithdraw;
 
@@ -188,7 +185,7 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         external
     {
         require(msg.sender == _bodhiTokenAddress, "Only NBOT is accepted");
-        require(data.length >= 4, "Data is not long enough.");
+        require(data.length >= 4, "Data is not long enough");
 
         bytes memory betFunc = hex"885ab66d";
         bytes memory setResultFunc = hex"a6b4218b";
@@ -243,10 +240,10 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
     }
 
     /// @notice Calculates the tokens returned based on the sender's participation.
-    /// @param better Address to calculate winnings for.
-    /// @return Amount of bet and vote tokens won.
+    /// @param player Address to calculate winnings for.
+    /// @return Amount of tokens that will be returned.
     function calculateWinnings(
-        address better)
+        address player)
         public
         view
         returns (uint)
@@ -257,56 +254,13 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
             return 0;
         }
 
-        // Calculate bet round losers' total
-        uint betRoundLosersTotal;
-        for (uint8 i = 0; i < _numOfResults; i++) {
-            if (i != _currentResultIndex) {
-                betRoundLosersTotal = 
-                    betRoundLosersTotal.add(_eventRounds[0].balances[i].total);
-            }
+        // Bets are returned if the currentResultIndex is Invalid
+        if (_currentResultIndex == 0) {
+            return calculateInvalidWinnings(player);
         }
 
-        // Subtract arbitration reward from bet round losers' total
-        uint arbitrationReward = 
-            uint(_arbitrationRewardPercentage).mul(betRoundLosersTotal).div(100);
-        betRoundLosersTotal = betRoundLosersTotal.sub(arbitrationReward);
-
-        // Calculate all vote rounds totals
-        uint voteRoundsWinnersTotal;
-        uint voteRoundsLosersTotal;
-        for (uint8 i = 1; i <= _currentRound; i++) {
-            for (uint8 j = 0; j < _numOfResults; j++) {
-                uint total = _eventRounds[i].balances[j].total;
-                if (j == _currentResultIndex) {
-                    voteRoundsWinnersTotal = voteRoundsWinnersTotal.add(total);
-                } else {
-                    voteRoundsLosersTotal = voteRoundsLosersTotal.add(total);
-                }
-            }
-        }
-
-        // Calculate all rounds totals
-        uint allRoundsWinnersTotal = _resultTotals[_currentResultIndex];
-        uint allRoundsLosersTotal = betRoundLosersTotal.add(voteRoundsLosersTotal);
-
-        // Calculate user's winning bets
-        uint allRoundsUserBets;
-        uint voteRoundsUserBets;
-        for (uint8 i = 0; i <= _currentRound; i++) {
-            uint bets = _eventRounds[i].balances[_currentResultIndex].bets[better];
-            allRoundsUserBets = allRoundsUserBets.add(bets);
-            if (i > 0) {
-                voteRoundsUserBets = voteRoundsUserBets.add(bets);
-            }
-        }
-
-        // Calculate users portion of all rounds losers total
-        uint winningAmt = allRoundsUserBets.mul(allRoundsLosersTotal)
-            .div(allRoundsWinnersTotal).add(allRoundsUserBets);
-        uint arbitrationRewardAmt = voteRoundsUserBets.mul(arbitrationReward)
-            .div(voteRoundsWinnersTotal);
-        winningAmt = winningAmt.add(arbitrationRewardAmt);
-        return winningAmt;
+        // Otherwise calculate winnings for a non-Invalid result
+        return calculateNormalWinnings(player);
     }
 
     function version() public pure returns (uint16) {
@@ -411,12 +365,10 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         require(value > 0, "Bet amount should be > 0");
 
         // Update balances
-        _eventRounds[0].balances[resultIndex].total =
-            _eventRounds[0].balances[resultIndex].total.add(value);
-        _eventRounds[0].balances[resultIndex].bets[from] =
-            _eventRounds[0].balances[resultIndex].bets[from].add(value);
-        _resultTotals[resultIndex] = _resultTotals[resultIndex].add(value);
         _totalBets = _totalBets.add(value);
+        _betRoundTotals[resultIndex] = _betRoundTotals[resultIndex].add(value);
+        _betRoundUserTotals[from][resultIndex] =
+            _betRoundUserTotals[from][resultIndex].add(value);
 
         // Emit events
         emit BetPlaced(address(this), from, resultIndex, value, _currentRound);
@@ -454,12 +406,10 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         _currentRound = _currentRound + 1;
 
         // Update balances
-        _eventRounds[1].balances[resultIndex].total =
-            _eventRounds[1].balances[resultIndex].total.add(value);
-        _eventRounds[1].balances[resultIndex].bets[from] =
-            _eventRounds[1].balances[resultIndex].bets[from].add(value);
-        _resultTotals[resultIndex] = _resultTotals[resultIndex].add(value);
         _totalBets = _totalBets.add(value);
+        _voteRoundsTotals[resultIndex] = _voteRoundsTotals[resultIndex].add(value);
+        _voteRoundsUserTotals[from][resultIndex] =
+            _voteRoundsUserTotals[from][resultIndex].add(value);
 
         // Init DecentralizedOracle round
         uint nextThreshold = getNextThreshold(_eventRounds[0].consensusThreshold);
@@ -495,22 +445,35 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
             "Cannot vote on the last result index");
         require(value > 0, "Vote amount should be > 0");
 
+        // Calculate diff if over threshold
+        uint adjustedValue = value;
+        uint refund;
+        if (_currentVotingRoundTotals[resultIndex].add(value) >
+            _eventRounds[_currentRound].consensusThreshold) {
+            adjustedValue = _eventRounds[_currentRound].consensusThreshold
+                .sub(_currentVotingRoundTotals[resultIndex]);
+            refund = _currentVotingRoundTotals[resultIndex]
+                .add(value)
+                .sub(_eventRounds[_currentRound].consensusThreshold);
+        }
+
         // Update balances
-        _eventRounds[_currentRound].balances[resultIndex].total =
-            _eventRounds[_currentRound].balances[resultIndex].total.add(value);
-        _eventRounds[_currentRound].balances[resultIndex].bets[from] =
-            _eventRounds[_currentRound].balances[resultIndex].bets[from].add(value);
-        _resultTotals[resultIndex] = _resultTotals[resultIndex].add(value);
-        _totalBets = _totalBets.add(value);
+        _totalBets = _totalBets.add(adjustedValue);
+        _voteRoundsTotals[resultIndex] =
+            _voteRoundsTotals[resultIndex].add(adjustedValue);
+        _voteRoundsUserTotals[from][resultIndex] =
+            _voteRoundsUserTotals[from][resultIndex].add(adjustedValue);
+        _currentVotingRoundTotals[resultIndex] = 
+            _currentVotingRoundTotals[resultIndex].add(adjustedValue);
 
         // Emit events
-        emit VotePlaced(address(this), from, resultIndex, value, _currentRound);
+        emit VotePlaced(address(this), from, resultIndex, adjustedValue,
+            _currentRound);
 
         // If voted over the threshold, create a new DecentralizedOracle round
-        uint resultVotes = _eventRounds[_currentRound].balances[resultIndex].total;
-        uint threshold = _eventRounds[_currentRound].consensusThreshold;
-        if (resultVotes >= threshold) {
-            voteSetResult(from, resultIndex, value);
+        if (_currentVotingRoundTotals[resultIndex] ==
+            _eventRounds[_currentRound].consensusThreshold) {
+            voteSetResult(from, resultIndex, adjustedValue, refund);
         }
     }
 
@@ -518,10 +481,12 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
     /// @param from Address who is voted over the threshold.
     /// @param resultIndex Index of result that was voted over the threshold.
     /// @param value Amount of tokens used to vote.
+    /// @param refund Amount to refund for voting over the threshold.
     function voteSetResult(
         address from,
         uint8 resultIndex,
-        uint value)
+        uint value,
+        uint refund)
         private
     {
         // Calculate next consensus threshold
@@ -535,6 +500,9 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         _currentResultIndex = resultIndex;
         _currentRound = _currentRound + 1;
 
+        // Clear current voting round totals
+        delete _currentVotingRoundTotals;
+
         // Init next DecentralizedOracle round
         uint arbitrationEndTime = block.timestamp.add(_arbitrationLength);
         initEventRound(
@@ -542,6 +510,11 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
             resultIndex,
             nextThreshold,
             arbitrationEndTime);
+
+        // Refund difference over threshold
+        if (refund > 0) {
+            INRC223(_bodhiTokenAddress).transfer(from, refund);
+        }
 
         // Emit events
         emit VoteResultSet(address(this), from, resultIndex, value, 
@@ -561,5 +534,99 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
     {
         uint increment = _thresholdPercentIncrease.mul(currentThreshold).div(100);
         return currentThreshold.add(increment);
+    }
+
+    /// @notice Calculates the tokens returned for a non-Invalid final result.
+    /// @param player Address to calculate winnings for.
+    /// @return Amount of tokens that will be returned.
+    function calculateNormalWinnings(
+        address player)
+        private
+        view
+        returns (uint)
+    {
+        // Calculate user's winning bets
+        uint myWinningBets = _betRoundUserTotals[player][_currentResultIndex];
+        uint myWinningVotes = _voteRoundsUserTotals[player][_currentResultIndex];
+
+        // Calculate bet and vote rounds losing totals
+        uint betRoundLosersTotal;
+        uint voteRoundsLosersTotal;
+        for (uint8 i = 0; i < _numOfResults; i++) {
+            if (i != _currentResultIndex) {
+                betRoundLosersTotal = betRoundLosersTotal.add(_betRoundTotals[i]);
+                voteRoundsLosersTotal =
+                    voteRoundsLosersTotal.add(_voteRoundsTotals[i]);
+            }
+        }
+
+        // Calculate user's winning amount for bet round
+        uint maxPercent = 100;
+        uint betRoundWinningAmt;
+        if (myWinningBets > 0 && _betRoundTotals[_currentResultIndex] > 0) {
+            uint percentage = maxPercent.sub(_arbitrationRewardPercentage);
+            betRoundWinningAmt =
+                betRoundLosersTotal
+                .mul(percentage)
+                .div(maxPercent)
+                .mul(myWinningBets)
+                .div(_betRoundTotals[_currentResultIndex]);
+        }
+
+        // Calculate user's winning amount for vote rounds
+        uint voteRoundsWinningAmt;
+        if (myWinningVotes > 0 && _voteRoundsTotals[_currentResultIndex] > 0) {
+            voteRoundsWinningAmt =
+                betRoundLosersTotal
+                .mul(_arbitrationRewardPercentage)
+                .div(maxPercent)
+                .add(voteRoundsLosersTotal)
+                .mul(myWinningVotes)
+                .div(_voteRoundsTotals[_currentResultIndex]);
+        }
+
+        return myWinningBets
+            .add(myWinningVotes)
+            .add(betRoundWinningAmt)
+            .add(voteRoundsWinningAmt);
+    }
+
+    /// @notice Calculates the tokens returned for an Invalid final result.
+    /// @param player Address to calculate winnings for.
+    /// @return Amount of tokens that will be returned.
+    function calculateInvalidWinnings(
+        address player)
+        private
+        view
+        returns (uint)
+    {
+        // Calculate user's winning bets
+        uint myWinningBets = _betRoundUserTotals[player][_currentResultIndex];
+        uint myWinningVotes = _voteRoundsUserTotals[player][_currentResultIndex];
+
+        // Calculate user's losing bets and vote rounds losing totals
+        uint myLosingBets;
+        uint voteRoundsLosersTotal;
+        for (uint8 i = 0; i < _numOfResults; i++) {
+            if (i != _currentResultIndex) {
+                myLosingBets = myLosingBets.add(_betRoundUserTotals[player][i]);
+                voteRoundsLosersTotal =
+                    voteRoundsLosersTotal.add(_voteRoundsTotals[i]);
+            }
+        }
+
+        // Calculate user's winning amount for vote rounds
+        uint voteRoundsWinningAmt;
+        if (myWinningVotes > 0 && _voteRoundsTotals[_currentResultIndex] > 0) {
+            voteRoundsWinningAmt =
+                voteRoundsLosersTotal
+                .mul(myWinningVotes)
+                .div(_voteRoundsTotals[_currentResultIndex]);
+        }
+
+        return myWinningBets
+            .add(myLosingBets)
+            .add(myWinningVotes)
+            .add(voteRoundsWinningAmt);
     }
 }

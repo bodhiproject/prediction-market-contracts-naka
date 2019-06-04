@@ -16,7 +16,7 @@ contract EventFactory is NRC223Receiver {
         uint amount;
     }
 
-    uint16 private constant VERSION = 3;
+    uint16 private constant VERSION = 5;
 
     address private _configManager;
     address private _bodhiTokenAddress;
@@ -54,7 +54,7 @@ contract EventFactory is NRC223Receiver {
         bytes memory funcHash = data.sliceBytes(0, 4);
         bytes memory params = data.sliceBytes(4, data.length - 4);
         bytes32 encodedFunc = keccak256(abi.encodePacked(funcHash));
-        if (encodedFunc == keccak256(abi.encodePacked(hex"2b2601bf"))) {
+        if (encodedFunc == keccak256(abi.encodePacked(hex"662edd20"))) {
             handleCreateMultipleResultsEvent(from, value, params);
         } else {
             revert("Unhandled function in tokenFallback");
