@@ -1,6 +1,7 @@
 const { assert } = require('chai')
 const TimeMachine = require('sol-time-machine')
 const sassert = require('sol-assert')
+const { isNumber } = require('lodash') 
 const getConstants = require('../constants')
 const {
   toDenomination,
@@ -22,6 +23,7 @@ const { toBN } = web3.utils;
 const CREATE_EVENT_FUNC_SIG = '662edd20'
 const BET_FUNC_SIG = '885ab66d'
 const SET_RESULT_FUNC_SIG = 'a6b4218b'
+const VOTE_FUNC_SIG = '1e00eb7f'
 const RESULT_INVALID = 'Invalid'
 const RESULT_INDEX_INVALID = 255
 const TOKEN_DECIMALS = 8
@@ -90,9 +92,11 @@ const createEvent = async (
 }
 
 const placeBet = async (
-  { nbotMethods, eventAddr, amtDecimals, resultIndex, from }
+  { nbotMethods, eventAddr, amtDecimals, amtSatoshi, resultIndex, from }
 ) => {
-  const amt = toDenomination(amtDecimals, TOKEN_DECIMALS)
+  const amt = isNumber(amtDecimals)
+    ? toDenomination(amtDecimals, TOKEN_DECIMALS)
+    : amtSatoshi
   const data = constructTransfer223Data(BET_FUNC_SIG, ['uint8'], [resultIndex])
   await nbotMethods['transfer(address,uint256,bytes)'](
     eventAddr,
@@ -109,6 +113,20 @@ const setResult = async (
     ['uint8'],
     [resultIndex]
   )
+  await nbotMethods['transfer(address,uint256,bytes)'](
+    eventAddr,
+    amt,
+    web3.utils.hexToBytes(data),
+  ).send({ from, gas: 300000 })
+}
+
+const placeVote = async (
+  { nbotMethods, eventAddr, amtDecimals, amtSatoshi, resultIndex, from }
+) => {
+  const amt = isNumber(amtDecimals)
+    ? toDenomination(amtDecimals, TOKEN_DECIMALS)
+    : amtSatoshi
+  const data = constructTransfer223Data(VOTE_FUNC_SIG, ['uint8'], [resultIndex])
   await nbotMethods['transfer(address,uint256,bytes)'](
     eventAddr,
     amt,
@@ -680,10 +698,167 @@ contract('MultipleResultsEvent', (accounts) => {
   })
 
   describe('vote()', () => {
+    let threshold
+
     describe('valid time', () => {
+      beforeEach(async () => {
+        const currTime = await currentBlockTime()
+        await timeMachine.increaseTime(resultSetStartTime - currTime)
+        assert.isAtLeast(await currentBlockTime(), resultSetStartTime)
+
+        threshold = await eventMethods.currentConsensusThreshold().call()
+        await setResult({
+          nbotMethods,
+          eventAddr,
+          amt: threshold,
+          resultIndex: 1,
+          from: OWNER,
+        })
+        assert.equal(await eventMethods.currentResultIndex().call(), 1)
+        assert.equal(await eventMethods.currentRound().call(), 1)
+        assert.isBelow(
+          await currentBlockTime(),
+          Number(await eventMethods.currentArbitrationEndTime().call()))
+      })
+
+      it('allows voting', async () => {
+        let amt = 1
+        await placeVote({
+          nbotMethods,
+          eventAddr,
+          amtDecimals: amt,
+          resultIndex: 2,
+          from: ACCT1,
+        })
+        let totalBets = toBN(threshold).add(toBN(toDenomination(amt, TOKEN_DECIMALS)))
+        sassert.bnEqual(await eventMethods.totalBets().call(), totalBets)
+
+        amt = 2
+        await placeVote({
+          nbotMethods,
+          eventAddr,
+          amtDecimals: amt,
+          resultIndex: 2,
+          from: ACCT2,
+        })
+        totalBets = totalBets.add(toBN(toDenomination(amt, TOKEN_DECIMALS)))
+        sassert.bnEqual(await eventMethods.totalBets().call(), totalBets)
+      })
+
+      it('sets the result if voting to the threshold', async () => {
+        const amt = await eventMethods.currentConsensusThreshold().call()
+        await placeVote({
+          nbotMethods,
+          eventAddr,
+          amtSatoshi: amt,
+          resultIndex: 2,
+          from: ACCT1,
+        })
+        let totalBets = toBN(threshold).add(toBN(amt))
+        sassert.bnEqual(await eventMethods.totalBets().call(), totalBets)
+        assert.equal(await eventMethods.currentResultIndex().call(), 2)
+        assert.equal(await eventMethods.currentRound().call(), 2)
+      })
+
+      it('refunds the diff over the threshold', async () => {
+        const balance = toBN(await nbotMethods.balanceOf(ACCT1).call())
+        const amt = toBN(await eventMethods.currentConsensusThreshold().call())
+        const diff = toBN(toDenomination(25, TOKEN_DECIMALS))
+        await placeVote({
+          nbotMethods,
+          eventAddr,
+          amtSatoshi: amt.add(diff).toString(),
+          resultIndex: 2,
+          from: ACCT1,
+        })
+        sassert.bnEqual(
+          await eventMethods.totalBets().call(),
+          toBN(threshold).add(amt))
+        assert.equal(await eventMethods.currentResultIndex().call(), 2)
+        assert.equal(await eventMethods.currentRound().call(), 2)
+        sassert.bnEqual(await nbotMethods.balanceOf(ACCT1).call(), balance.sub(amt))
+      })
+
+      it('throws if the resultIndex is invalid', async () => {
+        try {
+          await placeVote({
+            nbotMethods,
+            eventAddr,
+            amtDecimals: 1,
+            resultIndex: 4,
+            from: ACCT1,
+          })
+        } catch (e) {
+          sassert.revert(e, 'resultIndex is not valid')
+        }
+      })
+
+      it('throws if the current time is past the arbitrationEndTime', async () => {
+        const currTime = await currentBlockTime()
+        const arbEndTime = Number(await eventMethods.currentArbitrationEndTime().call())
+        await timeMachine.increaseTime(arbEndTime - currTime)
+        assert.isAtLeast(await currentBlockTime(), arbEndTime)
+
+        try {
+          await placeVote({
+            nbotMethods,
+            eventAddr,
+            amtDecimals: 1,
+            resultIndex: 2,
+            from: ACCT1,
+          })
+        } catch (e) {
+          sassert.revert(e, 'Current time should be < arbitrationEndTime')
+        }
+      })
+
+      it('throws if voting on the last result index', async () => {
+        assert.equal(await eventMethods.currentResultIndex().call(), 1)
+
+        try {
+          await placeVote({
+            nbotMethods,
+            eventAddr,
+            amtDecimals: 1,
+            resultIndex: 1,
+            from: ACCT1,
+          })
+        } catch (e) {
+          sassert.revert(e, 'Cannot vote on the last result index')
+        }
+      })
+
+      it('throws if the vote amount is 0', async () => {
+        try {
+          await placeVote({
+            nbotMethods,
+            eventAddr,
+            amtDecimals: 0,
+            resultIndex: 2,
+            from: ACCT1,
+          })
+        } catch (e) {
+          sassert.revert(e, 'Vote amount should be > 0')
+        }
+      })
     })
 
     describe('invalid time', () => {
+      it('throws if trying to vote in round 0', async () => {
+        assert.equal(await eventMethods.currentRound().call(), 0)
+
+        try {
+          await placeVote({
+            nbotMethods,
+            eventAddr,
+            amtDecimals: 1,
+            resultIndex: 1,
+            from: ACCT1,
+          })
+        } catch (e) {
+          sassert.revert(e, 'Can only vote after the betting round')
+        }
+      })
     })
   })
 
