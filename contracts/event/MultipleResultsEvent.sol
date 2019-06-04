@@ -445,21 +445,35 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
             "Cannot vote on the last result index");
         require(value > 0, "Vote amount should be > 0");
 
+        // Calculate diff if over threshold
+        uint adjustedValue = value;
+        uint refund;
+        if (_currentVotingRoundTotals[resultIndex].add(value) >
+            _eventRounds[_currentRound].consensusThreshold) {
+            adjustedValue = _eventRounds[_currentRound].consensusThreshold
+                .sub(_currentVotingRoundTotals[resultIndex]);
+            refund = _currentVotingRoundTotals[resultIndex]
+                .add(value)
+                .sub(_eventRounds[_currentRound].consensusThreshold);
+        }
+
         // Update balances
-        _totalBets = _totalBets.add(value);
-        _voteRoundsTotals[resultIndex] = _voteRoundsTotals[resultIndex].add(value);
+        _totalBets = _totalBets.add(adjustedValue);
+        _voteRoundsTotals[resultIndex] =
+            _voteRoundsTotals[resultIndex].add(adjustedValue);
         _voteRoundsUserTotals[from][resultIndex] =
-            _voteRoundsUserTotals[from][resultIndex].add(value);
+            _voteRoundsUserTotals[from][resultIndex].add(adjustedValue);
         _currentVotingRoundTotals[resultIndex] = 
-            _currentVotingRoundTotals[resultIndex].add(value);
+            _currentVotingRoundTotals[resultIndex].add(adjustedValue);
 
         // Emit events
-        emit VotePlaced(address(this), from, resultIndex, value, _currentRound);
+        emit VotePlaced(address(this), from, resultIndex, adjustedValue,
+            _currentRound);
 
         // If voted over the threshold, create a new DecentralizedOracle round
-        if (_currentVotingRoundTotals[resultIndex] >=
+        if (_currentVotingRoundTotals[resultIndex] ==
             _eventRounds[_currentRound].consensusThreshold) {
-            voteSetResult(from, resultIndex, value);
+            voteSetResult(from, resultIndex, adjustedValue, refund);
         }
     }
 
@@ -467,20 +481,14 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
     /// @param from Address who is voted over the threshold.
     /// @param resultIndex Index of result that was voted over the threshold.
     /// @param value Amount of tokens used to vote.
+    /// @param refund Amount to refund for voting over the threshold.
     function voteSetResult(
         address from,
         uint8 resultIndex,
-        uint value)
+        uint value,
+        uint refund)
         private
     {
-        // Calculate diff to refund if over threshold   
-        uint diff;
-        if (_currentVotingRoundTotals[resultIndex] >
-            _eventRounds[_currentRound].consensusThreshold) {
-            diff = _currentVotingRoundTotals[resultIndex]
-                .sub(_eventRounds[_currentRound].consensusThreshold);
-        }
-
         // Calculate next consensus threshold
         uint nextThreshold =
             getNextThreshold(_eventRounds[_currentRound].consensusThreshold);
@@ -504,8 +512,8 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
             arbitrationEndTime);
 
         // Refund difference over threshold
-        if (diff > 0) {
-            INRC223(_bodhiTokenAddress).transfer(from, diff);
+        if (refund > 0) {
+            INRC223(_bodhiTokenAddress).transfer(from, refund);
         }
 
         // Emit events
