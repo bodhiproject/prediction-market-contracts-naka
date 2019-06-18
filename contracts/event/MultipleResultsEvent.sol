@@ -101,7 +101,6 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
     /// @param eventName Question or statement prediction.
     /// @param eventResults Possible results.
     /// @param numOfResults Number of results.
-    /// @param betStartTime Unix time when betting will start.
     /// @param betEndTime Unix time when betting will end.
     /// @param resultSetStartTime Unix time when the CentralizedOracle can set the result.
     /// @param resultSetEndTime Unix time when anyone can set the result.
@@ -114,7 +113,6 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         string memory eventName,
         bytes32[4] memory eventResults,
         uint8 numOfResults,
-        uint betStartTime,
         uint betEndTime,
         uint resultSetStartTime,
         uint resultSetEndTime,
@@ -131,7 +129,7 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         require(eventNameBytes.length > 0, "Event name cannot be empty");
         require(!eventResults[1].isEmpty(), "First event result cannot be empty");
         require(!eventResults[2].isEmpty(), "Second event result cannot be empty");
-        require(betEndTime > betStartTime, "betEndTime should be > betStartTime");
+        require(betEndTime > block.timestamp, "betEndTime should be > current time");
         require(
             resultSetStartTime >= betEndTime,
             "resultSetStartTime should be >= betEndTime");
@@ -148,7 +146,7 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         _eventName = eventName;
         _eventResults = eventResults;
         _numOfResults = numOfResults;
-        _betStartTime = betStartTime;
+        _betStartTime = block.timestamp;
         _betEndTime = betEndTime;
         _resultSetStartTime = resultSetStartTime;
         _resultSetEndTime = resultSetEndTime;
