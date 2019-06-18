@@ -5,9 +5,7 @@ const { isNumber } = require('lodash')
 const getConstants = require('../constants')
 const {
   toSatoshi,
-  bigNumberFloor,
   currentBlockTime,
-  paddedHexToAddress,
   constructTransfer223Data,
   decodeEvent,
 } = require('../util')
