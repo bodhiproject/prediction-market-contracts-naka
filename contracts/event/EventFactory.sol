@@ -98,7 +98,7 @@ contract EventFactory is NRC223Receiver {
             uint));
         return createMultipleResultsEvent(from, value, eventName, eventResults, 
             betEndTime, resultSetStartTime, centralizedOracle,
-            arbitrationOptionIndex, arbitrationRewardPercentage); 
+            arbitrationOptionIndex, arbitrationRewardPercentage);
     }
 
     /// @dev Creates a new MultipleResultsEvent. Only tokenFallback can call this.
