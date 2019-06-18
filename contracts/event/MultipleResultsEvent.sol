@@ -22,7 +22,7 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         uint arbitrationEndTime;
     }
 
-    uint16 private constant VERSION = 5;
+    uint16 private constant VERSION = 6;
     uint8 private constant INVALID_RESULT_INDEX = 255;
 
     uint8 private _numOfResults;
@@ -490,6 +490,7 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         private
     {
         // Calculate next consensus threshold
+        uint currThreshold = _eventRounds[_currentRound].consensusThreshold;
         uint nextThreshold =
             getNextThreshold(_eventRounds[_currentRound].consensusThreshold);
         uint8 previousRound = _currentRound;
@@ -517,7 +518,7 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         }
 
         // Emit events
-        emit VoteResultSet(address(this), from, resultIndex, value, 
+        emit VoteResultSet(address(this), from, resultIndex, currThreshold, 
             previousRound, nextThreshold, arbitrationEndTime);
     }
 

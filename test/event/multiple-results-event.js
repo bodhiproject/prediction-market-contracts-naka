@@ -254,7 +254,7 @@ contract('MultipleResultsEvent', (accounts) => {
       assert.equal(await eventMethods.owner().call(), OWNER)
       
       const eventMeta = await eventMethods.eventMetadata().call()
-      assert.equal(eventMeta[0], 5)
+      assert.equal(eventMeta[0], 6)
       assert.equal(eventMeta[1], 'Test Event 1')
       assert.equal(web3.utils.toUtf8(eventMeta[2][0]), RESULT_INVALID)
       assert.equal(web3.utils.toUtf8(eventMeta[2][1]), 'A')
