@@ -23,6 +23,7 @@ const SET_RESULT_FUNC_SIG = 'a6b4218b'
 const VOTE_FUNC_SIG = '1e00eb7f'
 const RESULT_INVALID = 'Invalid'
 const RESULT_INDEX_INVALID = 255
+const ORACLE_RESULT_SETTING_LENGTH = 172800
 
 const fundUsers = async ({ nbotMethods, accounts }) => {
   await nbotMethods.transfer(accounts[1], toSatoshi(10000).toString())
@@ -47,7 +48,6 @@ const getEventParams = async (cOracle, currTime) => {
     ],
     currTime + 3000,
     currTime + 4000,
-    currTime + 6000,
     cOracle,
     0,
     10,
@@ -61,8 +61,7 @@ const createEvent = async (
     // Construct data
     const data = constructTransfer223Data(
       CREATE_EVENT_FUNC_SIG,
-      ['string', 'bytes32[3]', 'uint256', 'uint256', 'uint256', 'address',
-        'uint8', 'uint256'],
+      ['string', 'bytes32[3]', 'uint256', 'uint256', 'address', 'uint8', 'uint256'],
       eventParams,
     )
 
@@ -229,7 +228,7 @@ contract('MultipleResultsEvent', (accounts) => {
     eventParams = await getEventParams(OWNER, betStartTime)
     betEndTime = eventParams[2]
     resultSetStartTime = eventParams[3]
-    resultSetEndTime = eventParams[4]
+    resultSetEndTime = resultSetStartTime + ORACLE_RESULT_SETTING_LENGTH
 
     // NBOT.transfer() -> create event
     eventAddr = await createEvent({
@@ -258,7 +257,7 @@ contract('MultipleResultsEvent', (accounts) => {
       assert.equal(eventMeta[3], 4)
 
       const centralizedMeta = await eventMethods.centralizedMetadata().call()
-      assert.equal(centralizedMeta[0], eventParams[5])
+      assert.equal(centralizedMeta[0], eventParams[4])
       assert.equal(centralizedMeta[1], betStartTime)
       assert.equal(centralizedMeta[2], betEndTime)
       assert.equal(centralizedMeta[3], resultSetStartTime)
@@ -274,7 +273,7 @@ contract('MultipleResultsEvent', (accounts) => {
         configMeta[2],
         await configManagerMethods.thresholdPercentIncrease().call(),
       )
-      assert.equal(configMeta[3], eventParams[7])
+      assert.equal(configMeta[3], eventParams[6])
     })
 
     it('throws if centralizedOracle address is invalid', async () => {
@@ -353,24 +352,6 @@ contract('MultipleResultsEvent', (accounts) => {
       }
     })
 
-    it('throws if betEndTime is <= betStartTime', async () => {
-      try {
-        const params = await getEventParams(OWNER, await currentBlockTime())
-        params[0] = 'Test Event 5'
-        params[3] = params[2]
-        await createEvent({
-          nbotMethods,
-          eventParams: params,
-          eventFactoryAddr,
-          escrowAmt,
-          from: OWNER, 
-          gas: MAX_GAS,
-        })
-      } catch (e) {
-        sassert.revert(e, 'betEndTime should be > betStartTime')
-      }
-    })
-
     it('throws if resultSetStartTime is < betEndTime', async () => {
       try {
         const params = await getEventParams(OWNER, await currentBlockTime())
@@ -386,24 +367,6 @@ contract('MultipleResultsEvent', (accounts) => {
         })
       } catch (e) {
         sassert.revert(e, 'resultSetStartTime should be >= betEndTime')
-      }
-    })
-
-    it('throws if resultSetEndTime is <= resultSetStartTime', async () => {
-      try {
-        const params = await getEventParams(OWNER, await currentBlockTime())
-        params[0] = 'Test Event 7'
-        params[4] = params[3]
-        await createEvent({
-          nbotMethods,
-          eventParams: params,
-          eventFactoryAddr,
-          escrowAmt,
-          from: OWNER, 
-          gas: MAX_GAS,
-        })
-      } catch (e) {
-        sassert.revert(e, 'resultSetEndTime should be > resultSetStartTime')
       }
     })
   })
