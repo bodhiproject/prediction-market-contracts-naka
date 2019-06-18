@@ -92,14 +92,14 @@ contract EventFactory is NRC223Receiver {
         returns (MultipleResultsEvent)
     {
         (string memory eventName, bytes32[3] memory eventResults, 
-            uint betStartTime, uint betEndTime, uint resultSetStartTime,
-            uint resultSetEndTime, address centralizedOracle,
-            uint8 arbitrationOptionIndex, uint arbitrationRewardPercentage) =
+            uint betEndTime, uint resultSetStartTime, uint resultSetEndTime,
+            address centralizedOracle, uint8 arbitrationOptionIndex,
+            uint arbitrationRewardPercentage) =
             abi.decode(params, (string, bytes32[3], uint, uint, uint, uint, 
             address, uint8, uint));
         return createMultipleResultsEvent(from, value, eventName, eventResults, 
-            betStartTime, betEndTime, resultSetStartTime, resultSetEndTime, 
-            centralizedOracle, arbitrationOptionIndex, arbitrationRewardPercentage);
+            betEndTime, resultSetStartTime, resultSetEndTime, centralizedOracle,
+            arbitrationOptionIndex, arbitrationRewardPercentage);
     }
 
     /// @dev Creates a new MultipleResultsEvent. Only tokenFallback can call this.
@@ -107,7 +107,6 @@ contract EventFactory is NRC223Receiver {
     /// @param escrowDeposited Amount of escrow deposited to create the event.
     /// @param eventName Question or statement prediction.
     /// @param eventResults Possible results.
-    /// @param betStartTime Unix time when betting will start.
     /// @param betEndTime Unix time when betting will end.
     /// @param resultSetStartTime Unix time when the CentralizedOracle can set the result.
     /// @param resultSetEndTime Unix time when anyone can set the result.
@@ -120,7 +119,6 @@ contract EventFactory is NRC223Receiver {
         uint escrowDeposited,
         string memory eventName,
         bytes32[3] memory eventResults,
-        uint betStartTime,
         uint betEndTime,
         uint resultSetStartTime,
         uint resultSetEndTime,
@@ -152,8 +150,8 @@ contract EventFactory is NRC223Receiver {
 
         // Create event
         MultipleResultsEvent mrEvent = new MultipleResultsEvent(
-            creator, eventName, results, numOfResults, betStartTime,
-            betEndTime, resultSetStartTime, resultSetEndTime, centralizedOracle, 
+            creator, eventName, results, numOfResults, betEndTime,
+            resultSetStartTime, resultSetEndTime, centralizedOracle, 
             arbitrationOptionIndex, arbitrationRewardPercentage, _configManager);
 
         // Store escrow info
