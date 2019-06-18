@@ -95,8 +95,8 @@ contract EventFactory is NRC223Receiver {
             uint betEndTime, uint resultSetStartTime, uint resultSetEndTime,
             address centralizedOracle, uint8 arbitrationOptionIndex,
             uint arbitrationRewardPercentage) =
-            abi.decode(params, (string, bytes32[3], uint, uint, uint, uint, 
-            address, uint8, uint));
+            abi.decode(params, (string, bytes32[3], uint, uint, uint, address,
+            uint8, uint));
         return createMultipleResultsEvent(from, value, eventName, eventResults, 
             betEndTime, resultSetStartTime, resultSetEndTime, centralizedOracle,
             arbitrationOptionIndex, arbitrationRewardPercentage);
