@@ -258,6 +258,7 @@ contract('MultipleResultsEvent', (accounts) => {
 
       const centralizedMeta = await eventMethods.centralizedMetadata().call()
       assert.equal(centralizedMeta[0], eventParams[4])
+      // Block time during testing isn't completely accurate so test within a range
       assert.isTrue(centralizedMeta[1] >= betStartTime - 50
         && centralizedMeta[1] <= betStartTime + 50)
       assert.equal(centralizedMeta[2], betEndTime)
