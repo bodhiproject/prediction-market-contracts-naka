@@ -369,6 +369,42 @@ contract('MultipleResultsEvent', (accounts) => {
         sassert.revert(e, 'resultSetStartTime should be >= betEndTime')
       }
     })
+
+    it('throws if arbitrationOptionIndex is invalid', async () => {
+      try {
+        const params = await getEventParams(OWNER, await currentBlockTime())
+        params[0] = 'Test Event 7'
+        params[5] = 4
+        await createEvent({
+          nbotMethods,
+          eventParams: params,
+          eventFactoryAddr,
+          escrowAmt,
+          from: OWNER, 
+          gas: MAX_GAS,
+        })
+      } catch (e) {
+        sassert.revert(e, 'arbitrationOptionIndex should be < 4')
+      }
+    })
+
+    it('throws if arbitrationRewardPercentage is invalid', async () => {
+      try {
+        const params = await getEventParams(OWNER, await currentBlockTime())
+        params[0] = 'Test Event 8'
+        params[6] = 100
+        await createEvent({
+          nbotMethods,
+          eventParams: params,
+          eventFactoryAddr,
+          escrowAmt,
+          from: OWNER, 
+          gas: MAX_GAS,
+        })
+      } catch (e) {
+        sassert.revert(e, 'arbitrationRewardPercentage should be < 100')
+      }
+    })
   })
 
   describe('tokenFallback()', () => {
