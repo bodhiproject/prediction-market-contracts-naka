@@ -92,13 +92,12 @@ contract EventFactory is NRC223Receiver {
         returns (MultipleResultsEvent)
     {
         (string memory eventName, bytes32[3] memory eventResults, 
-            uint betEndTime, uint resultSetStartTime, uint resultSetEndTime,
-            address centralizedOracle, uint8 arbitrationOptionIndex,
-            uint arbitrationRewardPercentage) =
+            uint betEndTime, uint resultSetStartTime, address centralizedOracle,
+            uint8 arbitrationOptionIndex, uint arbitrationRewardPercentage) =
             abi.decode(params, (string, bytes32[3], uint, uint, uint, address,
             uint8, uint));
         return createMultipleResultsEvent(from, value, eventName, eventResults, 
-            betEndTime, resultSetStartTime, resultSetEndTime, centralizedOracle,
+            betEndTime, resultSetStartTime, centralizedOracle,
             arbitrationOptionIndex, arbitrationRewardPercentage);
     }
 
@@ -109,7 +108,6 @@ contract EventFactory is NRC223Receiver {
     /// @param eventResults Possible results.
     /// @param betEndTime Unix time when betting will end.
     /// @param resultSetStartTime Unix time when the CentralizedOracle can set the result.
-    /// @param resultSetEndTime Unix time when anyone can set the result.
     /// @param centralizedOracle Address of the user that will decide the result.
     /// @param arbitrationOptionIndex Index of the selected arbitration option.
     /// @param arbitrationRewardPercentage Percentage of loser's bets going to winning arbitrators.
@@ -121,7 +119,6 @@ contract EventFactory is NRC223Receiver {
         bytes32[3] memory eventResults,
         uint betEndTime,
         uint resultSetStartTime,
-        uint resultSetEndTime,
         address centralizedOracle,
         uint8 arbitrationOptionIndex,
         uint arbitrationRewardPercentage)
@@ -151,8 +148,8 @@ contract EventFactory is NRC223Receiver {
         // Create event
         MultipleResultsEvent mrEvent = new MultipleResultsEvent(
             creator, eventName, results, numOfResults, betEndTime,
-            resultSetStartTime, resultSetEndTime, centralizedOracle, 
-            arbitrationOptionIndex, arbitrationRewardPercentage, _configManager);
+            resultSetStartTime, centralizedOracle, arbitrationOptionIndex,
+            arbitrationRewardPercentage, _configManager);
 
         // Store escrow info
         _escrows[address(mrEvent)].depositer = creator;
