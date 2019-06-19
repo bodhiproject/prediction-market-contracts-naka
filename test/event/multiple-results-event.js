@@ -5,9 +5,7 @@ const { isNumber } = require('lodash')
 const getConstants = require('../constants')
 const {
   toSatoshi,
-  bigNumberFloor,
   currentBlockTime,
-  paddedHexToAddress,
   constructTransfer223Data,
   decodeEvent,
 } = require('../util')
@@ -25,7 +23,7 @@ const SET_RESULT_FUNC_SIG = 'a6b4218b'
 const VOTE_FUNC_SIG = '1e00eb7f'
 const RESULT_INVALID = 'Invalid'
 const RESULT_INDEX_INVALID = 255
-const TOKEN_DECIMALS = 8
+const ORACLE_RESULT_SETTING_LENGTH = 172800
 
 const fundUsers = async ({ nbotMethods, accounts }) => {
   await nbotMethods.transfer(accounts[1], toSatoshi(10000).toString())
@@ -40,8 +38,7 @@ const fundUsers = async ({ nbotMethods, accounts }) => {
     .send({ from: accounts[0] })
 }
 
-const getEventParams = async (cOracle) => {
-  const currTime = await currentBlockTime()
+const getEventParams = async (cOracle, currTime) => {
   return [
     'Test Event 1',
     [
@@ -49,10 +46,8 @@ const getEventParams = async (cOracle) => {
       web3.utils.fromAscii('B'),
       web3.utils.fromAscii('C'),
     ],
-    currTime + 1000,
     currTime + 3000,
     currTime + 4000,
-    currTime + 6000,
     cOracle,
     0,
     10,
@@ -66,8 +61,7 @@ const createEvent = async (
     // Construct data
     const data = constructTransfer223Data(
       CREATE_EVENT_FUNC_SIG,
-      ['string', 'bytes32[3]', 'uint256', 'uint256', 'uint256', 'uint256', 
-        'address', 'uint8', 'uint256'],
+      ['string', 'bytes32[3]', 'uint256', 'uint256', 'address', 'uint8', 'uint256'],
       eventParams,
     )
 
@@ -230,11 +224,11 @@ contract('MultipleResultsEvent', (accounts) => {
     configManagerMethods.setEventFactory(eventFactoryAddr).send({ from: OWNER })
 
     // Setup event params
-    eventParams = await getEventParams(OWNER)
-    betStartTime = eventParams[2]
-    betEndTime = eventParams[3]
-    resultSetStartTime = eventParams[4]
-    resultSetEndTime = eventParams[5]
+    betStartTime = await currentBlockTime()
+    eventParams = await getEventParams(OWNER, betStartTime)
+    betEndTime = eventParams[2]
+    resultSetStartTime = eventParams[3]
+    resultSetEndTime = resultSetStartTime + ORACLE_RESULT_SETTING_LENGTH
 
     // NBOT.transfer() -> create event
     eventAddr = await createEvent({
@@ -254,7 +248,7 @@ contract('MultipleResultsEvent', (accounts) => {
       assert.equal(await eventMethods.owner().call(), OWNER)
       
       const eventMeta = await eventMethods.eventMetadata().call()
-      assert.equal(eventMeta[0], 5)
+      assert.equal(eventMeta[0], 6)
       assert.equal(eventMeta[1], 'Test Event 1')
       assert.equal(web3.utils.toUtf8(eventMeta[2][0]), RESULT_INVALID)
       assert.equal(web3.utils.toUtf8(eventMeta[2][1]), 'A')
@@ -263,11 +257,13 @@ contract('MultipleResultsEvent', (accounts) => {
       assert.equal(eventMeta[3], 4)
 
       const centralizedMeta = await eventMethods.centralizedMetadata().call()
-      assert.equal(centralizedMeta[0], eventParams[6])
-      assert.equal(centralizedMeta[1], eventParams[2])
-      assert.equal(centralizedMeta[2], eventParams[3])
-      assert.equal(centralizedMeta[3], eventParams[4])
-      assert.equal(centralizedMeta[4], eventParams[5])
+      assert.equal(centralizedMeta[0], eventParams[4])
+      // Block time during testing isn't completely accurate so test within a range
+      assert.isTrue(centralizedMeta[1] >= betStartTime - 50
+        && centralizedMeta[1] <= betStartTime + 50)
+      assert.equal(centralizedMeta[2], betEndTime)
+      assert.equal(centralizedMeta[3], resultSetStartTime)
+      assert.equal(centralizedMeta[4], resultSetEndTime)
 
       const configMeta = await eventMethods.configMetadata().call()
       assert.equal(configMeta[0], escrowAmt)
@@ -279,12 +275,12 @@ contract('MultipleResultsEvent', (accounts) => {
         configMeta[2],
         await configManagerMethods.thresholdPercentIncrease().call(),
       )
-      assert.equal(configMeta[3], eventParams[8])
+      assert.equal(configMeta[3], eventParams[6])
     })
 
     it('throws if centralizedOracle address is invalid', async () => {
       try {
-        const params = await getEventParams(INVALID_ADDR)
+        const params = await getEventParams(INVALID_ADDR, await currentBlockTime())
         params[0] = 'Test Event 2'
         await createEvent({
           nbotMethods,
@@ -301,7 +297,7 @@ contract('MultipleResultsEvent', (accounts) => {
 
     it('throws if eventName is empty', async () => {
       try {
-        const params = await getEventParams(OWNER)
+        const params = await getEventParams(OWNER, await currentBlockTime())
         params[0] = ''
         await createEvent({
           nbotMethods,
@@ -318,7 +314,7 @@ contract('MultipleResultsEvent', (accounts) => {
 
     it('throws if eventResults 0 or 1 are empty', async () => {
       try {
-        const params = await getEventParams(OWNER)
+        const params = await getEventParams(OWNER, await currentBlockTime())
         params[0] = 'Test Event 3'
         params[1] = [
           web3.utils.fromAscii(''),
@@ -338,7 +334,7 @@ contract('MultipleResultsEvent', (accounts) => {
       }
 
       try {
-        const params = await getEventParams(OWNER)
+        const params = await getEventParams(OWNER, await currentBlockTime())
         params[0] = 'Test Event 4'
         params[1] = [
           web3.utils.fromAscii('A'),
@@ -358,29 +354,11 @@ contract('MultipleResultsEvent', (accounts) => {
       }
     })
 
-    it('throws if betEndTime is <= betStartTime', async () => {
-      try {
-        const params = await getEventParams(OWNER)
-        params[0] = 'Test Event 5'
-        params[3] = params[2]
-        await createEvent({
-          nbotMethods,
-          eventParams: params,
-          eventFactoryAddr,
-          escrowAmt,
-          from: OWNER, 
-          gas: MAX_GAS,
-        })
-      } catch (e) {
-        sassert.revert(e, 'betEndTime should be > betStartTime')
-      }
-    })
-
     it('throws if resultSetStartTime is < betEndTime', async () => {
       try {
-        const params = await getEventParams(OWNER)
+        const params = await getEventParams(OWNER, await currentBlockTime())
         params[0] = 'Test Event 6'
-        params[4] = params[3]
+        params[3] = params[2]
         await createEvent({
           nbotMethods,
           eventParams: params,
@@ -394,11 +372,11 @@ contract('MultipleResultsEvent', (accounts) => {
       }
     })
 
-    it('throws if resultSetEndTime is <= resultSetStartTime', async () => {
+    it('throws if arbitrationOptionIndex is invalid', async () => {
       try {
-        const params = await getEventParams(OWNER)
+        const params = await getEventParams(OWNER, await currentBlockTime())
         params[0] = 'Test Event 7'
-        params[5] = params[4]
+        params[5] = 4
         await createEvent({
           nbotMethods,
           eventParams: params,
@@ -408,7 +386,25 @@ contract('MultipleResultsEvent', (accounts) => {
           gas: MAX_GAS,
         })
       } catch (e) {
-        sassert.revert(e, 'resultSetEndTime should be > resultSetStartTime')
+        sassert.revert(e, 'arbitrationOptionIndex should be < 4')
+      }
+    })
+
+    it('throws if arbitrationRewardPercentage is invalid', async () => {
+      try {
+        const params = await getEventParams(OWNER, await currentBlockTime())
+        params[0] = 'Test Event 8'
+        params[6] = 100
+        await createEvent({
+          nbotMethods,
+          eventParams: params,
+          eventFactoryAddr,
+          escrowAmt,
+          from: OWNER, 
+          gas: MAX_GAS,
+        })
+      } catch (e) {
+        sassert.revert(e, 'arbitrationRewardPercentage should be < 100')
       }
     })
   })
@@ -443,9 +439,9 @@ contract('MultipleResultsEvent', (accounts) => {
     describe('valid time', () => {
       beforeEach(async () => {
         const currTime = await currentBlockTime()
-        await timeMachine.increaseTime(Number(eventParams[2]) - currTime)
-        assert.isAtLeast(await currentBlockTime(), Number(eventParams[2]))
-        assert.isBelow(await currentBlockTime(), Number(eventParams[3]))
+        await timeMachine.increaseTime(betStartTime - currTime)
+        assert.isAtLeast(await currentBlockTime(), betStartTime)
+        assert.isBelow(await currentBlockTime(), betEndTime)
       })
 
       it('allows users to bet', async () => {
@@ -474,8 +470,8 @@ contract('MultipleResultsEvent', (accounts) => {
   
       it('throws if the currentRound is not 0', async () => {
         const currTime = await currentBlockTime()
-        await timeMachine.increaseTime(Number(eventParams[4]) - currTime)
-        assert.isAtLeast(await currentBlockTime(), Number(eventParams[4]))
+        await timeMachine.increaseTime(resultSetStartTime - currTime)
+        assert.isAtLeast(await currentBlockTime(), resultSetStartTime)
 
         const amt = await eventMethods.currentConsensusThreshold().call()
         await setResult({
@@ -530,26 +526,10 @@ contract('MultipleResultsEvent', (accounts) => {
     })
 
     describe('invalid time', () => {
-      it('throws if the current time is < betStartTime', async () => {
-        assert.isBelow(await currentBlockTime(), Number(eventParams[2]))
-
-        try {
-          await placeBet({
-            nbotMethods,
-            eventAddr,
-            amtDecimals: 1,
-            resultIndex: 0,
-            from: OWNER,
-          })
-        } catch (e) {
-          sassert.revert(e, 'Current time should be >= betStartTime')
-        }
-      })
-
       it('throws if the current time is > betEndTime', async () => {
         const currTime = await currentBlockTime()
-        await timeMachine.increaseTime(Number(eventParams[3]) - currTime)
-        assert.isAtLeast(await currentBlockTime(), Number(eventParams[3]))
+        await timeMachine.increaseTime(betEndTime - currTime)
+        assert.isAtLeast(await currentBlockTime(), betEndTime)
 
         try {
           await placeBet({
