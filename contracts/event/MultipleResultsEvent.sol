@@ -24,6 +24,7 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
 
     uint16 private constant VERSION = 6;
     uint8 private constant INVALID_RESULT_INDEX = 255;
+    uint256 private constant ORACLE_RESULT_SETTING_LENGTH = 48 * 60 * 60; // 48 hours
 
     uint8 private _numOfResults;
     uint8 private _currentRound = 0;
@@ -101,10 +102,8 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
     /// @param eventName Question or statement prediction.
     /// @param eventResults Possible results.
     /// @param numOfResults Number of results.
-    /// @param betStartTime Unix time when betting will start.
     /// @param betEndTime Unix time when betting will end.
     /// @param resultSetStartTime Unix time when the CentralizedOracle can set the result.
-    /// @param resultSetEndTime Unix time when anyone can set the result.
     /// @param centralizedOracle Address of the user that will decide the result.
     /// @param arbitrationOptionIndex Index of the selected arbitration option.
     /// @param arbitrationRewardPercentage Percentage of loser's bets going to winning arbitrators.
@@ -114,10 +113,8 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         string memory eventName,
         bytes32[4] memory eventResults,
         uint8 numOfResults,
-        uint betStartTime,
         uint betEndTime,
         uint resultSetStartTime,
-        uint resultSetEndTime,
         address centralizedOracle,
         uint8 arbitrationOptionIndex,
         uint arbitrationRewardPercentage,
@@ -131,13 +128,10 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         require(eventNameBytes.length > 0, "Event name cannot be empty");
         require(!eventResults[1].isEmpty(), "First event result cannot be empty");
         require(!eventResults[2].isEmpty(), "Second event result cannot be empty");
-        require(betEndTime > betStartTime, "betEndTime should be > betStartTime");
+        require(betEndTime > block.timestamp, "betEndTime should be > current time");
         require(
             resultSetStartTime >= betEndTime,
             "resultSetStartTime should be >= betEndTime");
-        require(
-            resultSetEndTime > resultSetStartTime,
-            "resultSetEndTime should be > resultSetStartTime");
         require(
             arbitrationOptionIndex < 4,
             "arbitrationOptionIndex should be < 4");
@@ -148,10 +142,10 @@ contract MultipleResultsEvent is NRC223Receiver, Ownable {
         _eventName = eventName;
         _eventResults = eventResults;
         _numOfResults = numOfResults;
-        _betStartTime = betStartTime;
+        _betStartTime = block.timestamp;
         _betEndTime = betEndTime;
         _resultSetStartTime = resultSetStartTime;
-        _resultSetEndTime = resultSetEndTime;
+        _resultSetEndTime = resultSetStartTime.add(ORACLE_RESULT_SETTING_LENGTH);
         _centralizedOracle = centralizedOracle;
         _arbitrationRewardPercentage = arbitrationRewardPercentage;
 
