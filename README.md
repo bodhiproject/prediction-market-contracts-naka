@@ -1,1 +1,1 @@
-# Bodhi Prediction Market for Nakachain
+We've moved to https://gitlab.com/bodhiproject!
